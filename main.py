@@ -1,113 +1,82 @@
-# esp32_ap_server.py (ampliado)
-
 import network
 import socket
-import ure as re
-import ujson
 import time
+import ure
 
-# --- 1. Configurar el ESP32 como Access Point ---
+# Configuración del punto de acceso
 ap = network.WLAN(network.AP_IF)
 ap.active(True)
-ap.config(essid='GasMonitor_AP', authmode=network.AUTH_WPA_WPA2_PSK, password='12345678')
-print('AP activo, IP AP:', ap.ifconfig()[0])
+ap.config(essid='ESP32-AP', password='12345678', authmode=network.AUTH_WPA_WPA2_PSK)
 
-# --- 2. Preparar interfaz STA (para luego conectar a Wi-Fi real) ---
-sta = network.WLAN(network.STA_IF)
-sta.active(True)
+# Esperar a que el AP se active
+while not ap.active():
+    time.sleep(1)
+print('Access Point activo con IP:', ap.ifconfig()[0])
 
-# --- 3. Crear servidor HTTP en el puerto 80 ---
+# Conjunto para rastrear clientes conectados
+known_clients = set()
+
+# Función para detectar nuevos clientes
+def check_new_clients():
+    global known_clients
+    try:
+        stations = ap.status('stations')
+        current = set()
+        for s in stations:
+            if isinstance(s, tuple) and len(s) == 2:
+                mac, _ = s
+                current.add(bytes(mac))
+        newbies = current - known_clients
+        for mac in newbies:
+            mac_str = ':'.join('{:02x}'.format(b) for b in mac)
+            print('Nuevo cliente conectado:', mac_str)
+        known_clients = current
+    except Exception as e:
+        print('Error al verificar clientes conectados:', e)
+
+# Cargar contenido de index.html del sistema de archivos
+try:
+    with open('index.html', 'r') as f:
+        html = f.read()
+except OSError:
+    html = '<html><body><h1>Archivo no encontrado</h1></body></html>'
+
+# Crear socket HTTP
 addr = socket.getaddrinfo('0.0.0.0', 80)[0][-1]
-s = socket.socket()
-s.bind(addr)
-s.listen(1)
+sock = socket.socket()
+sock.bind(addr)
+sock.listen(1)
 print('Servidor HTTP escuchando en', addr)
 
-def parse_request(conn):
-    request = b''
-    while b'\r\n\r\n' not in request:
-        request += conn.recv(512)
-    header, _, rest = request.partition(b'\r\n\r\n')
-    lines = header.split(b'\r\n')
-    method, path, _ = lines[0].split(b' ', 2)
-    content_length = 0
-    for line in lines[1:]:
-        if line.lower().startswith(b'content-length:'):
-            content_length = int(line.split(b':')[1].strip())
-    body = rest
-    while len(body) < content_length:
-        body += conn.recv(512)
-    return method.decode(), path.decode(), body
-
-def handle_wifi_connect(data):
-    try:
-        creds = ujson.loads(data)
-        ssid = creds.get('ssid')
-        pwd  = creds.get('password')
-        if not ssid or not pwd:
-            raise ValueError
-        sta.connect(ssid, pwd)
-        for _ in range(15):
-            if sta.isconnected():
-                break
-            time.sleep(1)
-        if sta.isconnected():
-            return 200, {'status':'ok','ip':sta.ifconfig()[0]}
-        else:
-            return 500, {'status':'error','message':'No pudo conectar'}
-    except:
-        return 400, {'status':'error','message':'Datos inválidos'}
-
-def handle_wifi_scan():
-    # devuelve lista de redes: [(ssid, bssid, channel, RSSI, authmode, hidden), ...]
-    nets = sta.scan()
-    lista = []
-    for ssid_raw, bssid, chan, rssi, auth, hidden in nets:
-        ssid = ssid_raw.decode('utf-8')
-        # Si el SSID está vacío o solo espacios, no lo agregamos
-        if not ssid.strip():
-            continue
-
-        lista.append({
-            'ssid': ssid,
-            'bssid': ':'.join('{:02x}'.format(b) for b in bssid),
-            'channel': chan,
-            'rssi': rssi,
-            'authmode': auth,
-            'hidden': bool(hidden)
-        })
-    return 200, {'status':'ok', 'networks': lista}
-
-def handle_wifi_status():
-    if sta.isconnected():
-        return 200, {'status':'connected','ip':sta.ifconfig()[0]}
-    else:
-        return 200, {'status':'disconnected'}
-
 while True:
-    conn, addr = s.accept()
-    print('Cliente desde', addr)
+    # Verificar nuevas conexiones al AP
+    check_new_clients()
+
+    # Aceptar petición HTTP
+    cl, client_addr = sock.accept()
+    print('Petición de', client_addr)
+    req = cl.recv(1024)
     try:
-        method, path, body = parse_request(conn)
-        print('>>', method, path)
-        if method == 'POST' and path == '/wifi/connect':
-            status, response = handle_wifi_connect(body)
-        elif method == 'GET' and path == '/wifi/status':
-            status, response = handle_wifi_status()
-        elif method == 'GET' and path == '/wifi/scan':
-            status, response = handle_wifi_scan()
-            print(f'El estatus es {status} y la respuesta es {resp}')
-        else:
-            status, response = 404, {'status':'error','message':'No encontrado'}
-        resp = ujson.dumps(response)
-        print('la función retorna', response,' pero resp es', resp)
-        conn.send('HTTP/1.1 {} OK\r\n'.format(status))
-        conn.send('Content-Type: application/json\r\n')
-        conn.send('Content-Length: {}\r\n'.format(len(resp)))
-        conn.send('\r\n')
-        print('En conn.send resp enviando:', resp)
-        conn.send(resp)
-    except Exception as e:
-        print('Error:', e)
-    finally:
-        conn.close()
+        req_str = req.decode('utf-8')
+    except:
+        cl.close()
+        continue
+
+    # Parsear la ruta del GET
+    path = '/'
+    match = ure.search(r"GET\s+(/[^\s]*)", req_str)
+    if match:
+        path = match.group(1)
+    print('Ruta solicitada:', path)
+
+    # Responder según la ruta
+    if path == '/status':
+        response = 'HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nOK'
+        cl.send(response)
+    elif path == '/' or path == '/index.html':
+        cl.send('HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n\r\n')
+        cl.send(html)
+    else:
+        cl.send('HTTP/1.0 404 Not Found\r\nContent-Type: text/plain\r\n\r\n404')
+
+    cl.close()
