@@ -1,0 +1,1194 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Monitor Gas LP - Access Point</title>
+
+    <!-- Bootstrap CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome para iconos -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+
+    <style>
+      /* Configuración de colores personalizados para Tailwind */
+      :root {
+        --color-gray: #787878;
+        --color-white: #fffbfa;
+        --color-dark: #00203e;
+        --color-beige: #eae7cb;
+        --color-light: #fffaea;
+      }
+
+      body {
+        background: linear-gradient(
+          135deg,
+          var(--color-white) 0%,
+          var(--color-light) 100%
+        );
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
+        min-height: 100vh;
+      }
+
+      .custom-card {
+        background: var(--color-white);
+        border: 2px solid var(--color-beige);
+        border-radius: 20px;
+        box-shadow: 0 8px 32px rgba(0, 32, 62, 0.1);
+      }
+
+      .gauge-container {
+        position: relative;
+        width: 200px;
+        height: 200px;
+        margin: 0 auto;
+      }
+
+      .gauge-canvas {
+        border-radius: 50%;
+        background: var(--color-light);
+        border: 3px solid var(--color-beige);
+      }
+
+      .btn-custom {
+        background: var(--color-dark);
+        color: var(--color-white);
+        border: none;
+        border-radius: 15px;
+        padding: 12px 24px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+      }
+
+      .btn-custom:hover {
+        background: var(--color-gray);
+        color: var(--color-white);
+        transform: translateY(-2px);
+      }
+
+      .form-control-custom {
+        border: 2px solid var(--color-beige);
+        border-radius: 12px;
+        padding: 12px 16px;
+        background: var(--color-light);
+      }
+
+      .form-control-custom:focus {
+        border-color: var(--color-dark);
+        box-shadow: 0 0 0 0.2rem rgba(0, 32, 62, 0.25);
+        background: var(--color-white);
+      }
+
+      .alert-custom {
+        border-radius: 15px;
+        border: none;
+        font-weight: 600;
+      }
+
+      .nav-pills .nav-link {
+        border-radius: 15px;
+        margin: 0 5px;
+        font-weight: 600;
+      }
+
+      .nav-pills .nav-link.active {
+        background: var(--color-dark);
+      }
+
+      .wifi-item {
+        background: var(--color-light);
+        border: 2px solid var(--color-beige);
+        border-radius: 12px;
+        padding: 15px;
+        margin: 10px 0;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+
+      .wifi-item:hover {
+        background: var(--color-white);
+        border-color: var(--color-dark);
+        transform: translateY(-2px);
+      }
+
+      .wifi-item.selected {
+        background: var(--color-dark);
+        color: var(--color-white);
+        border-color: var(--color-dark);
+      }
+
+      .status-indicator {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 8px;
+      }
+
+      .status-connected {
+        background: #28a745;
+        animation: pulse 2s infinite;
+      }
+
+      .status-disconnected {
+        background: #dc3545;
+      }
+
+      @keyframes pulse {
+        0% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+        100% {
+          opacity: 1;
+        }
+      }
+
+      .gauge-value {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 24px;
+        font-weight: bold;
+        color: var(--color-dark);
+      }
+
+      .gauge-label {
+        position: absolute;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--color-gray);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container-fluid px-3 py-4">
+      <!-- Header -->
+      <div class="text-center mb-4">
+        <h1 class="h3 fw-bold" style="color: var(--color-dark)">
+          <i class="fas fa-wifi me-2"></i>Monitor Gas LP
+        </h1>
+        <div class="d-flex justify-content-center align-items-center mt-2">
+          <span class="status-indicator" id="connectionStatus"></span>
+          <span
+            id="currentSSID"
+            class="fw-semibold"
+            style="color: var(--color-gray)"
+            >Conectando...</span
+          >
+        </div>
+      </div>
+
+      <!-- Navigation Pills -->
+      <ul class="nav nav-pills justify-content-center mb-4" id="mainTabs">
+        <li class="nav-item">
+          <a class="nav-link active" data-bs-toggle="pill" href="#monitor">
+            <i class="fas fa-tachometer-alt me-1"></i>Monitor
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" data-bs-toggle="pill" href="#wifi">
+            <i class="fas fa-wifi me-1"></i>WiFi
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" data-bs-toggle="pill" href="#settings">
+            <i class="fas fa-cog me-1"></i>Configuración
+          </a>
+        </li>
+      </ul>
+
+      <!-- Tab Content -->
+      <div class="tab-content">
+        <!-- Monitor Tab -->
+        <div class="tab-pane fade show active" id="monitor">
+          <div class="row g-3">
+            <!-- Gas LP Gauge -->
+            <div class="col-12 col-md-6">
+              <div class="custom-card p-4 text-center">
+                <h5 class="fw-bold mb-3" style="color: var(--color-dark)">
+                  <i class="fas fa-fire me-2"></i>Gas LP
+                </h5>
+                <div class="gauge-container">
+                  <canvas
+                    id="gasGauge"
+                    class="gauge-canvas"
+                    width="200"
+                    height="200"
+                  ></canvas>
+                  <div class="gauge-value" id="gasValue">0%</div>
+                  <div class="gauge-label">PPM</div>
+                </div>
+                <div class="mt-3">
+                  <small class="text-muted"
+                    >Límite: <span id="gasLimit">500</span> PPM</small
+                  >
+                </div>
+              </div>
+            </div>
+
+            <!-- Smoke Gauge -->
+            <div class="col-12 col-md-6">
+              <div class="custom-card p-4 text-center">
+                <h5 class="fw-bold mb-3" style="color: var(--color-dark)">
+                  <i class="fas fa-smog me-2"></i>Humo
+                </h5>
+                <div class="gauge-container">
+                  <canvas
+                    id="smokeGauge"
+                    class="gauge-canvas"
+                    width="200"
+                    height="200"
+                  ></canvas>
+                  <div class="gauge-value" id="smokeValue">0%</div>
+                  <div class="gauge-label">PPM</div>
+                </div>
+                <div class="mt-3">
+                  <small class="text-muted"
+                    >Límite: <span id="smokeLimit">300</span> PPM</small
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Alert Area -->
+          <div id="alertArea" class="mt-4"></div>
+        </div>
+
+        <!-- WiFi Tab -->
+        <div class="tab-pane fade" id="wifi">
+          <div class="row g-3">
+            <!-- Current AP Settings -->
+            <div class="col-12">
+              <div class="custom-card p-4">
+                <h5 class="fw-bold mb-3" style="color: var(--color-dark)">
+                  <i class="fas fa-broadcast-tower me-2"></i>Configuración
+                  Access Point
+                </h5>
+                <form id="apConfigForm">
+                  <div class="mb-3">
+                    <label class="form-label fw-semibold">SSID Actual</label>
+                    <input
+                      type="text"
+                      class="form-control form-control-custom"
+                      id="currentAPSSID"
+                      value="GasMonitor_AP"
+                      readonly
+                    />
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label fw-semibold">Nuevo SSID</label>
+                    <input
+                      type="text"
+                      class="form-control form-control-custom"
+                      id="newSSID"
+                      placeholder="Ingrese nuevo SSID"
+                    />
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label fw-semibold"
+                      >Nueva Contraseña</label
+                    >
+                    <input
+                      type="password"
+                      class="form-control form-control-custom"
+                      id="newPassword"
+                      placeholder="Mínimo 8 caracteres"
+                    />
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label fw-semibold"
+                      >Contraseña Actual (para confirmar)</label
+                    >
+                    <input
+                      type="password"
+                      class="form-control form-control-custom"
+                      id="currentPassword"
+                      placeholder="Ingrese contraseña actual"
+                    />
+                  </div>
+                  <button type="submit" class="btn btn-custom w-100">
+                    <i class="fas fa-save me-2"></i>Actualizar Access Point
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            <!-- WiFi Networks -->
+            <div class="col-12">
+              <div class="custom-card p-4">
+                <div
+                  class="d-flex justify-content-between align-items-center mb-3"
+                >
+                  <h5 class="fw-bold mb-0" style="color: var(--color-dark)">
+                    <i class="fas fa-search me-2"></i>Redes WiFi Disponibles
+                  </h5>
+                  <button
+                    class="btn btn-outline-secondary btn-sm"
+                    id="scanWifi"
+                  >
+                    <i class="fas fa-sync-alt"></i>
+                  </button>
+                </div>
+                <div id="wifiList">
+                  <div class="text-center py-4">
+                    <div
+                      class="spinner-border"
+                      style="color: var(--color-dark)"
+                      role="status"
+                    >
+                      <span class="visually-hidden">Escaneando...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Escaneando redes WiFi...</p>
+                  </div>
+                </div>
+
+                <!-- WiFi Connection Form -->
+                <div id="wifiConnectionForm" class="mt-4" style="display: none">
+                  <h6 class="fw-bold">
+                    Conectar a: <span id="selectedSSID"></span>
+                  </h6>
+                  <form id="connectWifiForm">
+                    <div class="mb-3">
+                      <label class="form-label fw-semibold">Contraseña</label>
+                      <input
+                        type="password"
+                        class="form-control form-control-custom"
+                        id="wifiPassword"
+                        placeholder="Ingrese la contraseña"
+                      />
+                    </div>
+                    <div class="d-grid gap-2 d-md-flex">
+                      <button type="submit" class="btn btn-custom flex-fill">
+                        <i class="fas fa-link me-2"></i>Conectar
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-outline-secondary flex-fill"
+                        id="cancelConnection"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div class="tab-pane fade" id="settings">
+          <div class="custom-card p-4">
+            <h5 class="fw-bold mb-4" style="color: var(--color-dark)">
+              <i class="fas fa-sliders-h me-2"></i>Configuración de Límites
+            </h5>
+            <form id="limitsForm">
+              <div class="row g-3">
+                <div class="col-12 col-md-6">
+                  <label class="form-label fw-semibold"
+                    >Límite Gas LP (PPM)</label
+                  >
+                  <input
+                    type="number"
+                    class="form-control form-control-custom"
+                    id="gasLimitInput"
+                    value="500"
+                    min="100"
+                    max="2000"
+                  />
+                  <small class="text-muted">Rango: 100-2000 PPM</small>
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label fw-semibold"
+                    >Límite Humo (PPM)</label
+                  >
+                  <input
+                    type="number"
+                    class="form-control form-control-custom"
+                    id="smokeLimitInput"
+                    value="300"
+                    min="50"
+                    max="1000"
+                  />
+                  <small class="text-muted">Rango: 50-1000 PPM</small>
+                </div>
+              </div>
+              <button type="submit" class="btn btn-custom w-100 mt-4">
+                <i class="fas fa-save me-2"></i>Guardar Límites
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+      /*
+       * CONFIGURACIÓN DE ENDPOINTS
+       *
+       * Para integrar con tu hardware, reemplaza estas URLs con las reales:
+       *
+       * GET /api/status - Obtiene el estado actual (SSID, gas, humo)
+       * POST /api/ap/config - Actualiza configuración del AP
+       * GET /api/wifi/scan - Escanea redes WiFi disponibles
+       * POST /api/wifi/connect - Conecta a una red WiFi
+       * POST /api/limits - Actualiza los límites de gas y humo
+       *
+       * Ejemplo de respuesta esperada para /api/status:
+       * {
+       *   "ssid": "GasMonitor_AP",
+       *   "connected": true,
+       *   "gas_ppm": 150,
+       *   "smoke_ppm": 80,
+       *   "gas_limit": 500,
+       *   "smoke_limit": 300
+       * }
+       */
+
+      // Configuración de endpoints
+      const API_ENDPOINTS = {
+        status: "/api/status",
+        apConfig: "/api/ap/config",
+        wifiScan: "/api/wifi/scan",
+        wifiConnect: "/api/wifi/connect",
+        limits: "/api/limits",
+      };
+
+      // Variables globales
+      let gasGaugeCtx, smokeGaugeCtx;
+      let currentGasValue = 0;
+      let currentSmokeValue = 0;
+      let gasLimitValue = 500;
+      let smokeLimitValue = 300;
+      let updateInterval;
+      let selectedWifiSSID = "";
+
+      // Inicialización
+      document.addEventListener("DOMContentLoaded", function () {
+        initializeGauges();
+        loadInitialData();
+        startDataUpdate();
+        setupEventListeners();
+        scanWifiNetworks();
+      });
+
+      // Inicializar los tacómetros
+      function initializeGauges() {
+        const gasCanvas = document.getElementById("gasGauge");
+        const smokeCanvas = document.getElementById("smokeGauge");
+
+        gasGaugeCtx = gasCanvas.getContext("2d");
+        smokeGaugeCtx = smokeCanvas.getContext("2d");
+
+        drawGauge(gasGaugeCtx, 0, gasLimitValue, "gas");
+        drawGauge(smokeGaugeCtx, 0, smokeLimitValue, "smoke");
+      }
+
+      // Dibujar tacómetro
+      function drawGauge(ctx, value, limit, type) {
+        const centerX = 100;
+        const centerY = 100;
+        const radius = 80;
+
+        // Limpiar canvas
+        ctx.clearRect(0, 0, 200, 200);
+
+        // Fondo del gauge
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0.75 * Math.PI, 0.25 * Math.PI);
+        ctx.lineWidth = 20;
+        ctx.strokeStyle = "#EAE7CB";
+        ctx.stroke();
+
+        // Línea de límite
+        const limitAngle = 0.75 * Math.PI + (limit / 1000) * 1.5 * Math.PI;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, limitAngle - 0.05, limitAngle + 0.05);
+        ctx.lineWidth = 25;
+        ctx.strokeStyle = "#dc3545";
+        ctx.stroke();
+
+        // Valor actual
+        const valueAngle = 0.75 * Math.PI + (value / 1000) * 1.5 * Math.PI;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0.75 * Math.PI, valueAngle);
+        ctx.lineWidth = 20;
+
+        // Color basado en el valor vs límite
+        if (value >= limit) {
+          ctx.strokeStyle = "#dc3545"; // Rojo - peligro
+        } else if (value >= limit * 0.8) {
+          ctx.strokeStyle = "#ffc107"; // Amarillo - advertencia
+        } else {
+          ctx.strokeStyle = "#28a745"; // Verde - seguro
+        }
+        ctx.stroke();
+
+        // Aguja
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(valueAngle);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(radius - 10, 0);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "#00203E";
+        ctx.stroke();
+        ctx.restore();
+
+        // Centro
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 8, 0, 2 * Math.PI);
+        ctx.fillStyle = "#00203E";
+        ctx.fill();
+      }
+
+      // Cargar datos iniciales
+      async function loadInitialData() {
+        try {
+          // Simular llamada a API - reemplazar con fetch real
+          // const response = await fetch(API_ENDPOINTS.status);
+          // const data = await response.json();
+
+          // Datos simulados para demostración
+          const data = {
+            ssid: "GasMonitor_AP",
+            connected: true,
+            gas_ppm: 150,
+            smoke_ppm: 80,
+            gas_limit: 500,
+            smoke_limit: 300,
+          };
+
+          updateUI(data);
+        } catch (error) {
+          console.error("Error cargando datos iniciales:", error);
+          showAlert("Error al cargar datos iniciales", "danger");
+        }
+      }
+
+      // Actualizar interfaz con datos
+      function updateUI(data) {
+        // Actualizar SSID y estado de conexión
+        document.getElementById("currentSSID").textContent = data.ssid;
+        document.getElementById("currentAPSSID").value = data.ssid;
+
+        const statusIndicator = document.getElementById("connectionStatus");
+        statusIndicator.className = `status-indicator ${
+          data.connected ? "status-connected" : "status-disconnected"
+        }`;
+
+        // Actualizar valores de sensores
+        currentGasValue = data.gas_ppm;
+        currentSmokeValue = data.smoke_ppm;
+        gasLimitValue = data.gas_limit;
+        smokeLimitValue = data.smoke_limit;
+
+        // Actualizar tacómetros
+        drawGauge(gasGaugeCtx, currentGasValue, gasLimitValue, "gas");
+        drawGauge(smokeGaugeCtx, currentSmokeValue, smokeLimitValue, "smoke");
+
+        // Actualizar valores mostrados
+        document.getElementById("gasValue").textContent =
+          currentGasValue + " PPM";
+        document.getElementById("smokeValue").textContent =
+          currentSmokeValue + " PPM";
+        document.getElementById("gasLimit").textContent = gasLimitValue;
+        document.getElementById("smokeLimit").textContent = smokeLimitValue;
+
+        // Actualizar inputs de configuración solo si no están siendo editados
+        const gasLimitInput = document.getElementById("gasLimitInput");
+        const smokeLimitInput = document.getElementById("smokeLimitInput");
+
+        // Solo actualizar si el input no tiene focus (no está siendo editado)
+        if (document.activeElement !== gasLimitInput) {
+          gasLimitInput.value = gasLimitValue;
+        }
+        if (document.activeElement !== smokeLimitInput) {
+          smokeLimitInput.value = smokeLimitValue;
+        }
+
+        // Verificar límites y mostrar alertas
+        checkLimits();
+      }
+
+      // Verificar límites y mostrar alertas
+      function checkLimits() {
+        const alertArea = document.getElementById("alertArea");
+        alertArea.innerHTML = "";
+
+        if (currentGasValue >= gasLimitValue) {
+          showAlert(
+            `¡PELIGRO! Nivel de Gas LP: ${currentGasValue} PPM (Límite: ${gasLimitValue} PPM)`,
+            "danger",
+            true
+          );
+        }
+
+        if (currentSmokeValue >= smokeLimitValue) {
+          showAlert(
+            `¡PELIGRO! Nivel de Humo: ${currentSmokeValue} PPM (Límite: ${smokeLimitValue} PPM)`,
+            "danger",
+            true
+          );
+        }
+      }
+
+      // Mostrar alerta
+      function showAlert(message, type = "info", persistent = false) {
+        const alertArea = document.getElementById("alertArea");
+        const alertId = "alert_" + Date.now();
+
+        const alertHTML = `
+                <div class="alert alert-${type} alert-custom alert-dismissible fade show" id="${alertId}" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    ${message}
+                    ${
+                      !persistent
+                        ? '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>'
+                        : ""
+                    }
+                </div>
+            `;
+
+        alertArea.insertAdjacentHTML("beforeend", alertHTML);
+
+        if (!persistent) {
+          setTimeout(() => {
+            const alert = document.getElementById(alertId);
+            if (alert) {
+              alert.remove();
+            }
+          }, 5000);
+        }
+      }
+
+      // Iniciar actualización automática de datos
+      function startDataUpdate() {
+        updateInterval = setInterval(async () => {
+          try {
+            // Simular llamada a API - reemplazar con fetch real
+            // const response = await fetch(API_ENDPOINTS.status);
+            // const data = await response.json();
+
+            // Simulación de datos cambiantes
+            const data = {
+              ssid: "GasMonitor_AP",
+              connected: true,
+              gas_ppm: Math.floor(Math.random() * 600) + 50,
+              smoke_ppm: Math.floor(Math.random() * 400) + 30,
+              gas_limit: gasLimitValue,
+              smoke_limit: smokeLimitValue,
+            };
+
+            updateUI(data);
+          } catch (error) {
+            console.error("Error actualizando datos:", error);
+          }
+        }, 500); // Actualizar cada 0.5 segundos
+      }
+
+      // Configurar event listeners
+      function setupEventListeners() {
+        // Formulario de configuración AP
+        document
+          .getElementById("apConfigForm")
+          .addEventListener("submit", handleAPConfig);
+
+        // Formulario de conexión WiFi
+        document
+          .getElementById("connectWifiForm")
+          .addEventListener("submit", handleWifiConnect);
+
+        // Formulario de límites
+        document
+          .getElementById("limitsForm")
+          .addEventListener("submit", handleLimitsUpdate);
+
+        // Botón de escaneo WiFi
+        document
+          .getElementById("scanWifi")
+          .addEventListener("click", scanWifiNetworks);
+
+        // Botón cancelar conexión
+        document
+          .getElementById("cancelConnection")
+          .addEventListener("click", () => {
+            document.getElementById("wifiConnectionForm").style.display =
+              "none";
+            selectedWifiSSID = "";
+          });
+
+        // Configurar detección de edición de límites
+        setupLimitsEditingDetection();
+      }
+
+      // Manejar configuración de AP
+      async function handleAPConfig(e) {
+        e.preventDefault();
+
+        const newSSID = document.getElementById("newSSID").value;
+        const newPassword = document.getElementById("newPassword").value;
+        const currentPassword =
+          document.getElementById("currentPassword").value;
+
+        if (!newSSID || !newPassword || !currentPassword) {
+          showAlert("Por favor complete todos los campos", "warning");
+          return;
+        }
+
+        if (newPassword.length < 8) {
+          showAlert(
+            "La contraseña debe tener al menos 8 caracteres",
+            "warning"
+          );
+          return;
+        }
+
+        try {
+          // Llamada a API para actualizar configuración
+          /*
+                const response = await fetch(API_ENDPOINTS.apConfig, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        ssid: newSSID,
+                        password: newPassword,
+                        current_password: currentPassword
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showAlert('Configuración actualizada correctamente', 'success');
+                    document.getElementById('currentAPSSID').value = newSSID;
+                    document.getElementById('currentSSID').textContent = newSSID;
+                    // Limpiar formulario
+                    document.getElementById('newSSID').value = '';
+                    document.getElementById('newPassword').value = '';
+                    document.getElementById('currentPassword').value = '';
+                } else {
+                    showAlert(result.error || 'Error al actualizar configuración', 'danger');
+                }
+                */
+
+          // Simulación para demostración
+          showAlert("Configuración actualizada correctamente", "success");
+          document.getElementById("currentAPSSID").value = newSSID;
+          document.getElementById("currentSSID").textContent = newSSID;
+          document.getElementById("newSSID").value = "";
+          document.getElementById("newPassword").value = "";
+          document.getElementById("currentPassword").value = "";
+        } catch (error) {
+          console.error("Error:", error);
+          showAlert("Error de conexión", "danger");
+        }
+      }
+
+      // Escanear redes WiFi
+      async function scanWifiNetworks() {
+        const wifiList = document.getElementById("wifiList");
+        wifiList.innerHTML = `
+                <div class="text-center py-4">
+                    <div class="spinner-border" style="color: var(--color-dark);" role="status">
+                        <span class="visually-hidden">Escaneando...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Escaneando redes WiFi...</p>
+                </div>
+            `;
+
+        try {
+          // Llamada a API para escanear WiFi
+          /*
+                const response = await fetch(API_ENDPOINTS.wifiScan);
+                const networks = await response.json();
+                */
+
+          // Simulación de redes WiFi
+          const networks = [
+            { ssid: "Casa_WiFi", signal: -45, security: "WPA2" },
+            { ssid: "Oficina_5G", signal: -60, security: "WPA3" },
+            { ssid: "Vecino_WiFi", signal: -75, security: "WPA2" },
+            { ssid: "Red_Publica", signal: -80, security: "Open" },
+          ];
+
+          displayWifiNetworks(networks);
+        } catch (error) {
+          console.error("Error escaneando WiFi:", error);
+          wifiList.innerHTML = `
+                    <div class="text-center py-4">
+                        <i class="fas fa-exclamation-triangle fa-2x text-warning"></i>
+                        <p class="mt-2 text-muted">Error al escanear redes</p>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="scanWifiNetworks()">
+                            Reintentar
+                        </button>
+                    </div>
+                `;
+        }
+      }
+
+      // Mostrar redes WiFi
+      function displayWifiNetworks(networks) {
+        const wifiList = document.getElementById("wifiList");
+
+        if (networks.length === 0) {
+          wifiList.innerHTML = `
+                    <div class="text-center py-4">
+                        <i class="fas fa-wifi fa-2x text-muted"></i>
+                        <p class="mt-2 text-muted">No se encontraron redes</p>
+                    </div>
+                `;
+          return;
+        }
+
+        const networksHTML = networks
+          .map((network) => {
+            const signalStrength = getSignalStrength(network.signal);
+            const securityIcon =
+              network.security === "Open" ? "fa-unlock" : "fa-lock";
+
+            return `
+                    <div class="wifi-item" onclick="selectWifiNetwork('${network.ssid}')">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="fw-semibold">${network.ssid}</div>
+                                <small class="text-muted">
+                                    <i class="fas ${securityIcon} me-1"></i>${network.security}
+                                </small>
+                            </div>
+                            <div class="text-end">
+                                <i class="fas fa-wifi ${signalStrength.class}"></i>
+                                <small class="d-block text-muted">${network.signal} dBm</small>
+                            </div>
+                        </div>
+                    </div>
+                `;
+          })
+          .join("");
+
+        wifiList.innerHTML = networksHTML;
+      }
+
+      // Obtener fuerza de señal
+      function getSignalStrength(signal) {
+        if (signal >= -50)
+          return { class: "text-success", strength: "Excelente" };
+        if (signal >= -60) return { class: "text-success", strength: "Buena" };
+        if (signal >= -70)
+          return { class: "text-warning", strength: "Regular" };
+        return { class: "text-danger", strength: "Débil" };
+      }
+
+      // Seleccionar red WiFi
+      function selectWifiNetwork(ssid) {
+        selectedWifiSSID = ssid;
+
+        // Remover selección previa
+        document.querySelectorAll(".wifi-item").forEach((item) => {
+          item.classList.remove("selected");
+        });
+
+        // Seleccionar nueva red
+        event.currentTarget.classList.add("selected");
+
+        // Mostrar formulario de conexión
+        document.getElementById("selectedSSID").textContent = ssid;
+        document.getElementById("wifiConnectionForm").style.display = "block";
+        document.getElementById("wifiPassword").value = "";
+        document.getElementById("wifiPassword").focus();
+      }
+
+      // Manejar conexión WiFi
+      async function handleWifiConnect(e) {
+        e.preventDefault();
+
+        const password = document.getElementById("wifiPassword").value;
+
+        if (!password && selectedWifiSSID !== "Red_Publica") {
+          showAlert("Por favor ingrese la contraseña", "warning");
+          return;
+        }
+
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML =
+          '<i class="fas fa-spinner fa-spin me-2"></i>Conectando...';
+        submitBtn.disabled = true;
+
+        try {
+          // Llamada a API para conectar WiFi
+          /*
+                const response = await fetch(API_ENDPOINTS.wifiConnect, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        ssid: selectedWifiSSID,
+                        password: password
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showAlert(`Conectado exitosamente a ${selectedWifiSSID}`, 'success');
+                    document.getElementById('currentSSID').textContent = selectedWifiSSID;
+                    document.getElementById('wifiConnectionForm').style.display = 'none';
+                } else {
+                    showAlert(result.error || 'Error al conectar', 'danger');
+                    document.getElementById('wifiPassword').value = '';
+                    document.getElementById('wifiPassword').focus();
+                }
+                */
+
+          // Simulación para demostración
+          setTimeout(() => {
+            const success = Math.random() > 0.3; // 70% de éxito
+
+            if (success) {
+              showAlert(
+                `Conectado exitosamente a ${selectedWifiSSID}`,
+                "success"
+              );
+              document.getElementById("currentSSID").textContent =
+                selectedWifiSSID;
+              document.getElementById("wifiConnectionForm").style.display =
+                "none";
+              document.getElementById("connectionStatus").className =
+                "status-indicator status-connected";
+            } else {
+              showAlert(
+                "Error al conectar. Verifique la contraseña e intente nuevamente.",
+                "danger"
+              );
+              document.getElementById("wifiPassword").value = "";
+              document.getElementById("wifiPassword").focus();
+            }
+
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+          }, 2000);
+        } catch (error) {
+          console.error("Error:", error);
+          showAlert("Error de conexión", "danger");
+          submitBtn.innerHTML = originalText;
+          submitBtn.disabled = false;
+        }
+      }
+
+      // Manejar actualización de límites
+      async function handleLimitsUpdate(e) {
+        e.preventDefault();
+
+        const newGasLimit = parseInt(
+          document.getElementById("gasLimitInput").value
+        );
+        const newSmokeLimit = parseInt(
+          document.getElementById("smokeLimitInput").value
+        );
+
+        if (newGasLimit < 100 || newGasLimit > 2000) {
+          showAlert(
+            "El límite de Gas LP debe estar entre 100 y 2000 PPM",
+            "warning"
+          );
+          return;
+        }
+
+        if (newSmokeLimit < 50 || newSmokeLimit > 1000) {
+          showAlert(
+            "El límite de Humo debe estar entre 50 y 1000 PPM",
+            "warning"
+          );
+          return;
+        }
+
+        try {
+          // Llamada a API para actualizar límites
+          /*
+                const response = await fetch(API_ENDPOINTS.limits, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        gas_limit: newGasLimit,
+                        smoke_limit: newSmokeLimit
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    gasLimitValue = newGasLimit;
+                    smokeLimitValue = newSmokeLimit;
+                    
+                    document.getElementById('gasLimit').textContent = gasLimitValue;
+                    document.getElementById('smokeLimit').textContent = smokeLimitValue;
+                    
+                    // Redibujar tacómetros con nuevos límites
+                    drawGauge(gasGaugeCtx, currentGasValue, gasLimitValue, 'gas');
+                    drawGauge(smokeGaugeCtx, currentSmokeValue, smokeLimitValue, 'smoke');
+                    
+                    showAlert('Límites actualizados correctamente', 'success');
+                } else {
+                    showAlert(result.error || 'Error al actualizar límites', 'danger');
+                }
+                */
+
+          // Simulación para demostración
+          gasLimitValue = newGasLimit;
+          smokeLimitValue = newSmokeLimit;
+
+          document.getElementById("gasLimit").textContent = gasLimitValue;
+          document.getElementById("smokeLimit").textContent = smokeLimitValue;
+
+          // Redibujar tacómetros con nuevos límites
+          drawGauge(gasGaugeCtx, currentGasValue, gasLimitValue, "gas");
+          drawGauge(smokeGaugeCtx, currentSmokeValue, smokeLimitValue, "smoke");
+
+          showAlert("Límites actualizados correctamente", "success");
+        } catch (error) {
+          console.error("Error:", error);
+          showAlert("Error de conexión", "danger");
+        }
+
+        // Al final de la función handleLimitsUpdate, después del showAlert de éxito, agrega:
+        const quickSaveBtn = document.getElementById("quickSaveBtn");
+        if (quickSaveBtn) {
+          quickSaveBtn.remove();
+        }
+        isEditingLimits = false;
+      }
+
+      // Variables para controlar el estado de edición
+      let isEditingLimits = false;
+      let limitsEditTimeout;
+
+      // Detectar cuando el usuario está editando los límites
+      function setupLimitsEditingDetection() {
+        const gasLimitInput = document.getElementById("gasLimitInput");
+        const smokeLimitInput = document.getElementById("smokeLimitInput");
+
+        [gasLimitInput, smokeLimitInput].forEach((input) => {
+          input.addEventListener("focus", () => {
+            isEditingLimits = true;
+            clearTimeout(limitsEditTimeout);
+          });
+
+          input.addEventListener("blur", () => {
+            // Esperar un poco antes de permitir actualizaciones automáticas
+            limitsEditTimeout = setTimeout(() => {
+              isEditingLimits = false;
+            }, 1000);
+          });
+
+          input.addEventListener("input", () => {
+            isEditingLimits = true;
+            clearTimeout(limitsEditTimeout);
+
+            // Auto-guardar después de 2 segundos sin cambios
+            clearTimeout(limitsEditTimeout);
+            limitsEditTimeout = setTimeout(() => {
+              if (validateAndPreviewLimits()) {
+                // Mostrar preview de los cambios
+                showLimitsPreview();
+              }
+            }, 2000);
+          });
+        });
+      }
+
+      // Validar y mostrar preview de límites
+      function validateAndPreviewLimits() {
+        const gasLimit = parseInt(
+          document.getElementById("gasLimitInput").value
+        );
+        const smokeLimit = parseInt(
+          document.getElementById("smokeLimitInput").value
+        );
+
+        if (
+          gasLimit >= 100 &&
+          gasLimit <= 2000 &&
+          smokeLimit >= 50 &&
+          smokeLimit <= 1000
+        ) {
+          return { gasLimit, smokeLimit };
+        }
+        return null;
+      }
+
+      // Mostrar preview de cambios en límites
+      function showLimitsPreview() {
+        const limits = validateAndPreviewLimits();
+        if (!limits) return;
+
+        // Actualizar preview en tiempo real en los tacómetros
+        drawGauge(gasGaugeCtx, currentGasValue, limits.gasLimit, "gas");
+        drawGauge(smokeGaugeCtx, currentSmokeValue, limits.smokeLimit, "smoke");
+
+        // Mostrar botón de guardar si hay cambios
+        showSaveButton();
+      }
+
+      // Mostrar botón de guardar cambios
+      function showSaveButton() {
+        const existingBtn = document.getElementById("quickSaveBtn");
+        if (existingBtn) return;
+
+        const limitsForm = document.getElementById("limitsForm");
+        const saveBtn = document.createElement("button");
+        saveBtn.id = "quickSaveBtn";
+        saveBtn.type = "button";
+        saveBtn.className = "btn btn-success btn-sm mt-2";
+        saveBtn.innerHTML = '<i class="fas fa-check me-1"></i>Aplicar Cambios';
+        saveBtn.onclick = () => {
+          document
+            .getElementById("limitsForm")
+            .dispatchEvent(new Event("submit"));
+        };
+
+        limitsForm.appendChild(saveBtn);
+
+        // Auto-remover después de 10 segundos
+        setTimeout(() => {
+          if (document.getElementById("quickSaveBtn")) {
+            document.getElementById("quickSaveBtn").remove();
+          }
+        }, 10000);
+      }
+
+      // Limpiar intervalo al salir
+      window.addEventListener("beforeunload", () => {
+        if (updateInterval) {
+          clearInterval(updateInterval);
+        }
+      });
+    </script>
+  </body>
+</html>
