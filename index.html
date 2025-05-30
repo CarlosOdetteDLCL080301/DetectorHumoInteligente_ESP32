@@ -1,954 +1,965 @@
 <!DOCTYPE html>
 <html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Control Access Point - Monitor Gas LP</title>
     <style>
-      /* Paleta de colores:
+        /* Paleta de colores:
            #787878 - Gris medio
            #FFFBFA - Blanco cálido
            #00203E - Azul marino oscuro
            #EAE7CB - Beige claro
            #FFFAEA - Amarillo muy claro
         */
-
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-
-      body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-          sans-serif;
-        background: linear-gradient(135deg, #fffbfa 0%, #eae7cb 100%);
-        color: #00203e;
-        min-height: 100vh;
-        padding: 10px;
-      }
-
-      .container {
-        max-width: 400px;
-        margin: 0 auto;
-        background: #fffbfa;
-        border-radius: 20px;
-        box-shadow: 0 10px 30px rgba(0, 32, 62, 0.1);
-        overflow: hidden;
-      }
-
-      .header {
-        background: linear-gradient(135deg, #00203e 0%, #787878 100%);
-        color: #fffbfa;
-        padding: 20px;
-        text-align: center;
-      }
-
-      .header h1 {
-        font-size: 1.5rem;
-        margin-bottom: 5px;
-      }
-
-      .status-indicator {
-        display: inline-block;
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        background: #4caf50;
-        margin-left: 10px;
-        animation: pulse 2s infinite;
-      }
-
-      @keyframes pulse {
-        0% {
-          opacity: 1;
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        50% {
-          opacity: 0.5;
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #FFFBFA 0%, #EAE7CB 100%);
+            color: #00203E;
+            min-height: 100vh;
+            padding: 10px;
         }
-        100% {
-          opacity: 1;
+        
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: #FFFBFA;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 32, 62, 0.1);
+            overflow: hidden;
         }
-      }
-
-      .content {
-        padding: 20px;
-      }
-
-      .section {
-        margin-bottom: 25px;
-        background: #fffaea;
-        border-radius: 15px;
-        padding: 20px;
-        border: 2px solid #eae7cb;
-      }
-
-      .section h2 {
-        color: #00203e;
-        font-size: 1.2rem;
-        margin-bottom: 15px;
-        display: flex;
-        align-items: center;
-      }
-
-      .section h2::before {
-        content: "";
-        width: 4px;
-        height: 20px;
-        background: #00203e;
-        margin-right: 10px;
-        border-radius: 2px;
-      }
-
-      /* Tacómetros */
-      .gauges-container {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 20px;
-        margin-bottom: 20px;
-      }
-
-      .gauge {
-        text-align: center;
-      }
-
-      .gauge-circle {
-        width: 120px;
-        height: 120px;
-        margin: 0 auto 10px;
-        position: relative;
-      }
-
-      .gauge-svg {
-        width: 100%;
-        height: 100%;
-        transform: rotate(-90deg);
-      }
-
-      .gauge-bg {
-        fill: none;
-        stroke: #eae7cb;
-        stroke-width: 8;
-      }
-
-      .gauge-fill {
-        fill: none;
-        stroke-width: 8;
-        stroke-linecap: round;
-        transition: stroke-dasharray 0.3s ease;
-      }
-
-      .gauge-warning {
-        fill: none;
-        stroke: #ff6b35;
-        stroke-width: 2;
-        stroke-dasharray: 2 2;
-      }
-
-      .gauge-value {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        font-size: 1.5rem;
-        font-weight: bold;
-        color: #00203e;
-      }
-
-      .gauge-label {
-        font-size: 0.9rem;
-        color: #787878;
-        margin-top: 5px;
-      }
-
-      /* Formularios */
-      .form-group {
-        margin-bottom: 15px;
-      }
-
-      .form-group label {
-        display: block;
-        margin-bottom: 5px;
-        color: #00203e;
-        font-weight: 500;
-      }
-
-      .form-group input,
-      .form-group select {
-        width: 100%;
-        padding: 12px;
-        border: 2px solid #eae7cb;
-        border-radius: 10px;
-        font-size: 1rem;
-        background: #fffbfa;
-        color: #00203e;
-        transition: border-color 0.3s ease;
-      }
-
-      .form-group input:focus,
-      .form-group select:focus {
-        outline: none;
-        border-color: #00203e;
-      }
-
-      .btn {
-        width: 100%;
-        padding: 12px;
-        border: none;
-        border-radius: 10px;
-        font-size: 1rem;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        margin-top: 10px;
-      }
-
-      .btn-primary {
-        background: #00203e;
-        color: #fffbfa;
-      }
-
-      .btn-primary:hover {
-        background: #787878;
-        transform: translateY(-2px);
-      }
-
-      .btn-secondary {
-        background: #eae7cb;
-        color: #00203e;
-      }
-
-      .btn-secondary:hover {
-        background: #787878;
-        color: #fffbfa;
-      }
-
-      .btn-danger {
-        background: #ff6b35;
-        color: #fffbfa;
-      }
-
-      /* Alertas */
-      .alert {
-        padding: 15px;
-        border-radius: 10px;
-        margin-bottom: 15px;
-        display: none;
-      }
-
-      .alert-success {
-        background: #d4edda;
-        color: #155724;
-        border: 1px solid #c3e6cb;
-      }
-
-      .alert-danger {
-        background: #f8d7da;
-        color: #721c24;
-        border: 1px solid #f5c6cb;
-      }
-
-      .alert-warning {
-        background: #fff3cd;
-        color: #856404;
-        border: 1px solid #ffeaa7;
-      }
-
-      /* WiFi Networks */
-      .wifi-network {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 12px;
-        border: 2px solid #eae7cb;
-        border-radius: 10px;
-        margin-bottom: 10px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-      }
-
-      .wifi-network:hover {
-        border-color: #00203e;
-        background: #fffaea;
-      }
-
-      .wifi-network.selected {
-        border-color: #00203e;
-        background: #fffaea;
-      }
-
-      .wifi-signal {
-        font-size: 1.2rem;
-      }
-
-      /* Tabs */
-      .tabs {
-        display: flex;
-        margin-bottom: 20px;
-        background: #eae7cb;
-        border-radius: 10px;
-        padding: 5px;
-      }
-
-      .tab {
-        flex: 1;
-        padding: 10px;
-        text-align: center;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        font-weight: 500;
-      }
-
-      .tab.active {
-        background: #00203e;
-        color: #fffbfa;
-      }
-
-      .tab-content {
-        display: none;
-      }
-
-      .tab-content.active {
-        display: block;
-      }
-
-      /* Responsive */
-      @media (max-width: 480px) {
+        
+        .header {
+            background: linear-gradient(135deg, #00203E 0%, #787878 100%);
+            color: #FFFBFA;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 1.5rem;
+            margin-bottom: 5px;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #4CAF50;
+            margin-left: 10px;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .content {
+            padding: 20px;
+        }
+        
+        .section {
+            margin-bottom: 25px;
+            background: #FFFAEA;
+            border-radius: 15px;
+            padding: 20px;
+            border: 2px solid #EAE7CB;
+        }
+        
+        .section h2 {
+            color: #00203E;
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .section h2::before {
+            content: '';
+            width: 4px;
+            height: 20px;
+            background: #00203E;
+            margin-right: 10px;
+            border-radius: 2px;
+        }
+        
+        /* Tacómetros */
         .gauges-container {
-          grid-template-columns: 1fr;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
         }
-
+        
+        .gauge {
+            text-align: center;
+        }
+        
         .gauge-circle {
-          width: 150px;
-          height: 150px;
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 10px;
+            position: relative;
         }
-      }
-
-      /* Loading spinner */
-      .loading {
-        display: inline-block;
-        width: 20px;
-        height: 20px;
-        border: 3px solid #eae7cb;
-        border-radius: 50%;
-        border-top-color: #00203e;
-        animation: spin 1s ease-in-out infinite;
-      }
-
-      @keyframes spin {
-        to {
-          transform: rotate(360deg);
+        
+        .gauge-svg {
+            width: 100%;
+            height: 100%;
+            transform: rotate(-90deg);
         }
-      }
-
-      /* Estilos adicionales para alertas mejoradas */
-      .alert {
-        position: relative;
-        animation: slideIn 0.3s ease-out;
-      }
-
-      .alert-danger {
-        animation: pulse-danger 2s infinite;
-      }
-
-      @keyframes slideIn {
-        from {
-          opacity: 0;
-          transform: translateY(-20px);
+        
+        .gauge-bg {
+            fill: none;
+            stroke: #EAE7CB;
+            stroke-width: 8;
         }
-        to {
-          opacity: 1;
-          transform: translateY(0);
+        
+        .gauge-fill {
+            fill: none;
+            stroke-width: 8;
+            stroke-linecap: round;
+            transition: stroke-dasharray 0.3s ease;
         }
-      }
+        
+        .gauge-warning {
+            fill: none;
+            stroke: #FF6B35;
+            stroke-width: 2;
+            stroke-dasharray: 2 2;
+        }
+        
+        .gauge-value {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #00203E;
+        }
+        
+        .gauge-label {
+            font-size: 0.9rem;
+            color: #787878;
+            margin-top: 5px;
+        }
+        
+        /* Formularios */
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #00203E;
+            font-weight: 500;
+        }
+        
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #EAE7CB;
+            border-radius: 10px;
+            font-size: 1rem;
+            background: #FFFBFA;
+            color: #00203E;
+            transition: border-color 0.3s ease;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #00203E;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+        
+        .btn-primary {
+            background: #00203E;
+            color: #FFFBFA;
+        }
+        
+        .btn-primary:hover {
+            background: #787878;
+            transform: translateY(-2px);
+        }
+        
+        .btn-secondary {
+            background: #EAE7CB;
+            color: #00203E;
+        }
+        
+        .btn-secondary:hover {
+            background: #787878;
+            color: #FFFBFA;
+        }
+        
+        .btn-danger {
+            background: #FF6B35;
+            color: #FFFBFA;
+        }
+        
+        /* Alertas */
+        .alert {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .alert-danger {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .alert-warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        /* WiFi Networks */
+        .wifi-network {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            border: 2px solid #EAE7CB;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .wifi-network:hover {
+            border-color: #00203E;
+            background: #FFFAEA;
+        }
+        
+        .wifi-network.selected {
+            border-color: #00203E;
+            background: #FFFAEA;
+        }
+        
+        .wifi-signal {
+            font-size: 1.2rem;
+        }
+        
+        /* Tabs */
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            background: #EAE7CB;
+            border-radius: 10px;
+            padding: 5px;
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+        
+        .tab.active {
+            background: #00203E;
+            color: #FFFBFA;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* Responsive */
+        @media (max-width: 480px) {
+            .gauges-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .gauge-circle {
+                width: 150px;
+                height: 150px;
+            }
+        }
+        
+        /* Loading spinner */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #EAE7CB;
+            border-radius: 50%;
+            border-top-color: #00203E;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
 
-      @keyframes pulse-danger {
-        0%,
-        100% {
-          border-color: #f5c6cb;
+        /* Estilos adicionales para alertas mejoradas */
+        .alert {
+            position: relative;
+            animation: slideIn 0.3s ease-out;
         }
-        50% {
-          border-color: #dc3545;
-          box-shadow: 0 0 10px rgba(220, 53, 69, 0.3);
-        }
-      }
 
-      .alert .close-btn {
-        position: absolute;
-        top: 10px;
-        right: 15px;
-        background: none;
-        border: none;
-        font-size: 1.2rem;
-        cursor: pointer;
-        color: inherit;
-      }
+        .alert-danger {
+            animation: pulse-danger 2s infinite;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes pulse-danger {
+            0%, 100% {
+                border-color: #f5c6cb;
+            }
+            50% {
+                border-color: #dc3545;
+                box-shadow: 0 0 10px rgba(220, 53, 69, 0.3);
+            }
+        }
+
+        .alert .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            color: inherit;
+        }
+
+        /* Estilos para botón de calibración */
+        .btn-secondary {
+            margin-top: 10px;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn:disabled:hover {
+            transform: none;
+            background: inherit;
+        }
+
+        /* Alerta de calibración con formato especial */
+        .alert-success {
+            white-space: pre-line;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
     </style>
-  </head>
-  <body>
+</head>
+<body>
     <div class="container">
-      <!-- Header -->
-      <div class="header">
-        <h1>Monitor Gas LP</h1>
-        <div>
-          <span id="current-ssid">AP_GasMonitor_001</span>
-          <span class="status-indicator"></span>
-        </div>
-      </div>
-
-      <div class="content">
-        <!-- Alertas -->
-        <div id="alert-container"></div>
-
-        <!-- Tacómetros -->
-        <div class="section">
-          <h2>Monitoreo en Tiempo Real</h2>
-          <div class="gauges-container">
-            <!-- Tacómetro Gas LP -->
-            <div class="gauge">
-              <div class="gauge-circle">
-                <svg class="gauge-svg" viewBox="0 0 100 100">
-                  <circle
-                    class="gauge-bg"
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    stroke-dasharray="251.2"
-                    stroke-dashoffset="0"
-                  ></circle>
-                  <circle
-                    class="gauge-warning"
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    stroke-dasharray="251.2"
-                    stroke-dashoffset="125.6"
-                    id="gas-warning-line"
-                  ></circle>
-                  <circle
-                    class="gauge-fill"
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    stroke-dasharray="251.2"
-                    stroke-dashoffset="251.2"
-                    id="gas-gauge"
-                    stroke="#4CAF50"
-                  ></circle>
-                </svg>
-                <div class="gauge-value" id="gas-value">0%</div>
-              </div>
-              <div class="gauge-label">Gas LP</div>
+        <!-- Header -->
+        <div class="header">
+            <h1>Monitor Gas LP</h1>
+            <div>
+                <span id="current-ssid">AP_GasMonitor_001</span>
+                <span class="status-indicator"></span>
             </div>
-
-            <!-- Tacómetro Humo -->
-            <div class="gauge">
-              <div class="gauge-circle">
-                <svg class="gauge-svg" viewBox="0 0 100 100">
-                  <circle
-                    class="gauge-bg"
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    stroke-dasharray="251.2"
-                    stroke-dashoffset="0"
-                  ></circle>
-                  <circle
-                    class="gauge-warning"
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    stroke-dasharray="251.2"
-                    stroke-dashoffset="125.6"
-                    id="smoke-warning-line"
-                  ></circle>
-                  <circle
-                    class="gauge-fill"
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    stroke-dasharray="251.2"
-                    stroke-dashoffset="251.2"
-                    id="smoke-gauge"
-                    stroke="#2196F3"
-                  ></circle>
-                </svg>
-                <div class="gauge-value" id="smoke-value">0%</div>
-              </div>
-              <div class="gauge-label">Humo</div>
+        </div>
+        
+        <div class="content">
+            <!-- Alertas -->
+            <div id="alert-container"></div>
+            
+            <!-- Tacómetros -->
+            <div class="section">
+                <h2>Monitoreo en Tiempo Real</h2>
+                <div class="gauges-container">
+                    <!-- Tacómetro Gas LP -->
+                    <div class="gauge">
+                        <div class="gauge-circle">
+                            <svg class="gauge-svg" viewBox="0 0 100 100">
+                                <circle class="gauge-bg" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="0"></circle>
+                                <circle class="gauge-warning" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="125.6" id="gas-warning-line"></circle>
+                                <circle class="gauge-fill" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="251.2" id="gas-gauge" stroke="#4CAF50"></circle>
+                            </svg>
+                            <div class="gauge-value" id="gas-value">0%</div>
+                        </div>
+                        <div class="gauge-label">Gas LP</div>
+                    </div>
+                    
+                    <!-- Tacómetro Humo -->
+                    <div class="gauge">
+                        <div class="gauge-circle">
+                            <svg class="gauge-svg" viewBox="0 0 100 100">
+                                <circle class="gauge-bg" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="0"></circle>
+                                <circle class="gauge-warning" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="125.6" id="smoke-warning-line"></circle>
+                                <circle class="gauge-fill" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="251.2" id="smoke-gauge" stroke="#2196F3"></circle>
+                            </svg>
+                            <div class="gauge-value" id="smoke-value">0%</div>
+                        </div>
+                        <div class="gauge-label">Humo</div>
+                    </div>
+                </div>
             </div>
-          </div>
+            
+            <!-- Tabs de configuración -->
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('limits')">Límites</div>
+                <div class="tab" onclick="switchTab('wifi')">WiFi</div>
+                <div class="tab" onclick="switchTab('access-point')">Access Point</div>
+            </div>
+            
+            <!-- Configuración de Límites -->
+            <div id="limits-tab" class="tab-content active">
+                <div class="section">
+                    <h2>Configurar Límites de Advertencia</h2>
+                    <form id="limits-form">
+                        <div class="form-group">
+                            <label for="gas-limit">Límite Gas LP (%)</label>
+                            <input type="number" id="gas-limit" min="0" max="100" value="80" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="smoke-limit">Límite Humo (%)</label>
+                            <input type="number" id="smoke-limit" min="0" max="100" value="70" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Actualizar Límites</button>
+                        <button type="button" class="btn btn-secondary" onclick="calibrateZero()" id="calibrate-btn">
+                            <span id="calibrate-text">Calibrar Valor Cero</span>
+                            <span id="calibrate-loading" class="loading" style="display: none;"></span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Configuración WiFi -->
+            <div id="wifi-tab" class="tab-content">
+                <div class="section">
+                    <h2>Conectar a Red WiFi</h2>
+                    <button class="btn btn-secondary" onclick="scanWifiNetworks()">
+                        <span id="scan-text">Escanear Redes</span>
+                        <span id="scan-loading" class="loading" style="display: none;"></span>
+                    </button>
+                    
+                    <div id="wifi-networks" style="margin-top: 15px;"></div>
+                    
+                    <form id="wifi-form" style="display: none;">
+                        <div class="form-group">
+                            <label for="selected-ssid">Red Seleccionada</label>
+                            <input type="text" id="selected-ssid" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label for="wifi-password">Contraseña</label>
+                            <input type="password" id="wifi-password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Conectar</button>
+                        <button type="button" class="btn btn-secondary" onclick="cancelWifiConnection()">Cancelar</button>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Configuración Access Point -->
+            <div id="access-point-tab" class="tab-content">
+                <div class="section">
+                    <h2>Configurar Access Point</h2>
+                    <form id="ap-form">
+                        <div class="form-group">
+                            <label for="current-password">Contraseña Actual</label>
+                            <input type="password" id="current-password" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="new-ssid">Nuevo SSID</label>
+                            <input type="text" id="new-ssid" maxlength="32" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="new-password">Nueva Contraseña</label>
+                            <input type="password" id="new-password" minlength="8" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="confirm-password">Confirmar Contraseña</label>
+                            <input type="password" id="confirm-password" minlength="8" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Actualizar Access Point</button>
+                    </form>
+                </div>
+            </div>
         </div>
-
-        <!-- Tabs de configuración -->
-        <div class="tabs">
-          <div class="tab active" onclick="switchTab('limits')">Límites</div>
-          <div class="tab" onclick="switchTab('wifi')">WiFi</div>
-          <div class="tab" onclick="switchTab('access-point')">
-            Access Point
-          </div>
-        </div>
-
-        <!-- Configuración de Límites -->
-        <div id="limits-tab" class="tab-content active">
-          <div class="section">
-            <h2>Configurar Límites de Advertencia</h2>
-            <form id="limits-form">
-              <div class="form-group">
-                <label for="gas-limit">Límite Gas LP (%)</label>
-                <input
-                  type="number"
-                  id="gas-limit"
-                  min="0"
-                  max="100"
-                  value="80"
-                  required
-                />
-              </div>
-              <div class="form-group">
-                <label for="smoke-limit">Límite Humo (%)</label>
-                <input
-                  type="number"
-                  id="smoke-limit"
-                  min="0"
-                  max="100"
-                  value="70"
-                  required
-                />
-              </div>
-              <button type="submit" class="btn btn-primary">
-                Actualizar Límites
-              </button>
-            </form>
-          </div>
-        </div>
-
-        <!-- Configuración WiFi -->
-        <div id="wifi-tab" class="tab-content">
-          <div class="section">
-            <h2>Conectar a Red WiFi</h2>
-            <button class="btn btn-secondary" onclick="scanWifiNetworks()">
-              <span id="scan-text">Escanear Redes</span>
-              <span
-                id="scan-loading"
-                class="loading"
-                style="display: none"
-              ></span>
-            </button>
-
-            <div id="wifi-networks" style="margin-top: 15px"></div>
-
-            <form id="wifi-form" style="display: none">
-              <div class="form-group">
-                <label for="selected-ssid">Red Seleccionada</label>
-                <input type="text" id="selected-ssid" readonly />
-              </div>
-              <div class="form-group">
-                <label for="wifi-password">Contraseña</label>
-                <input type="password" id="wifi-password" required />
-              </div>
-              <button type="submit" class="btn btn-primary">Conectar</button>
-              <button
-                type="button"
-                class="btn btn-secondary"
-                onclick="cancelWifiConnection()"
-              >
-                Cancelar
-              </button>
-            </form>
-          </div>
-        </div>
-
-        <!-- Configuración Access Point -->
-        <div id="access-point-tab" class="tab-content">
-          <div class="section">
-            <h2>Configurar Access Point</h2>
-            <form id="ap-form">
-              <div class="form-group">
-                <label for="current-password">Contraseña Actual</label>
-                <input type="password" id="current-password" required />
-              </div>
-              <div class="form-group">
-                <label for="new-ssid">Nuevo SSID</label>
-                <input type="text" id="new-ssid" maxlength="32" required />
-              </div>
-              <div class="form-group">
-                <label for="new-password">Nueva Contraseña</label>
-                <input
-                  type="password"
-                  id="new-password"
-                  minlength="8"
-                  required
-                />
-              </div>
-              <div class="form-group">
-                <label for="confirm-password">Confirmar Contraseña</label>
-                <input
-                  type="password"
-                  id="confirm-password"
-                  minlength="8"
-                  required
-                />
-              </div>
-              <button type="submit" class="btn btn-primary">
-                Actualizar Access Point
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
     </div>
 
     <script>
-      /*
-       * CONFIGURACIÓN DE ENDPOINTS
-       *
-       * Para integrar con tu hardware, necesitarás implementar estos endpoints HTTP:
-       *
-       * GET /api/sensor-data
-       * - Retorna: { gasLevel: number, smokeLevel: number }
-       * - Se llama cada 0.5 segundos para actualizar los tacómetros
-       *
-       * GET /api/wifi/scan
-       * - Retorna: [{ ssid: string, signal: number, security: string }]
-       * - Escanea redes WiFi disponibles
-       *
-       * POST /api/wifi/connect
-       * - Body: { ssid: string, password: string }
-       * - Retorna: { success: boolean, message: string }
-       * - Conecta a una red WiFi específica
-       *
-       * POST /api/access-point/update
-       * - Body: { currentPassword: string, newSSID: string, newPassword: string }
-       * - Retorna: { success: boolean, message: string }
-       * - Actualiza configuración del Access Point
-       *
-       * POST /api/limits/update
-       * - Body: { gasLimit: number, smokeLimit: number }
-       * - Retorna: { success: boolean, message: string }
-       * - Actualiza límites de advertencia
-       *
-       * GET /api/status
-       * - Retorna: { ssid: string, mode: string, connected: boolean }
-       * - Obtiene estado actual del dispositivo
-       */
-
-      // Variables globales
-      let gasLimit = 80;
-      let smokeLimit = 70;
-      let selectedWifiNetwork = null;
-      let sensorUpdateInterval = null;
-      let gasAlertActive = false;
-      let smokeAlertActive = false;
-
-      // Inicialización
-      document.addEventListener("DOMContentLoaded", function () {
-        startSensorUpdates();
-        loadCurrentStatus();
-        updateWarningLines();
-      });
-
-      // Función para cambiar tabs
-      function switchTab(tabName) {
-        // Remover clase active de todos los tabs
-        document
-          .querySelectorAll(".tab")
-          .forEach((tab) => tab.classList.remove("active"));
-        document
-          .querySelectorAll(".tab-content")
-          .forEach((content) => content.classList.remove("active"));
-
-        // Activar tab seleccionado
-        event.target.classList.add("active");
-        document.getElementById(tabName + "-tab").classList.add("active");
-      }
-
-      // Actualización de sensores cada 0.5 segundos
-      function startSensorUpdates() {
-        sensorUpdateInterval = setInterval(updateSensorData, 500);
-      }
-
-      async function updateSensorData() {
-        try {
-          // Endpoint GET para obtener datos de sensores
-          const response = await fetch("http://192.168.4.1/api/sensor-data");
-          const data = await response.json();
-
-          updateGauge("gas", data.gasLevel);
-          updateGauge("smoke", data.smokeLevel);
-
-          // Verificar límites y mostrar alertas
-          checkLimits(data.gasLevel, data.smokeLevel);
-        } catch (error) {
-          console.error("Error al obtener datos de sensores:", error);
-          // En caso de error, simular datos para demostración
-          simulateSensorData();
+        /*
+         * CONFIGURACIÓN DE ENDPOINTS
+         * 
+         * Para integrar con tu hardware, necesitarás implementar estos endpoints HTTP:
+         * 
+         * GET /api/sensor-data
+         * - Retorna: { gasLevel: number, smokeLevel: number }
+         * - Se llama cada 0.5 segundos para actualizar los tacómetros
+         * 
+         * GET /api/wifi/scan
+         * - Retorna: [{ ssid: string, signal: number, security: string }]
+         * - Escanea redes WiFi disponibles
+         * 
+         * POST /api/wifi/connect
+         * - Body: { ssid: string, password: string }
+         * - Retorna: { success: boolean, message: string }
+         * - Conecta a una red WiFi específica
+         * 
+         * POST /api/access-point/update
+         * - Body: { currentPassword: string, newSSID: string, newPassword: string }
+         * - Retorna: { success: boolean, message: string }
+         * - Actualiza configuración del Access Point
+         * 
+         * POST /api/limits/update
+         * - Body: { gasLimit: number, smokeLimit: number }
+         * - Retorna: { success: boolean, message: string }
+         * - Actualiza límites de advertencia
+         * 
+         * GET /api/status
+         * - Retorna: { ssid: string, mode: string, connected: boolean }
+         * - Obtiene estado actual del dispositivo
+         */
+        
+        // Variables globales
+        let gasLimit = 80;
+        let smokeLimit = 70;
+        let selectedWifiNetwork = null;
+        let sensorUpdateInterval = null;
+        let gasAlertActive = false;
+        let smokeAlertActive = false;
+        
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', function() {
+            startSensorUpdates();
+            loadCurrentStatus();
+            updateWarningLines();
+        });
+        
+        // Función para cambiar tabs
+        function switchTab(tabName) {
+            // Remover clase active de todos los tabs
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            // Activar tab seleccionado
+            event.target.classList.add('active');
+            document.getElementById(tabName + '-tab').classList.add('active');
         }
-      }
-
-      // Simulación de datos para demostración (remover en producción)
-      function simulateSensorData() {
-        const gasLevel = Math.random() * 100;
-        const smokeLevel = Math.random() * 100;
-
-        updateGauge("gas", gasLevel);
-        updateGauge("smoke", smokeLevel);
-        checkLimits(gasLevel, smokeLevel);
-      }
-
-      // Actualizar tacómetro
-      function updateGauge(type, value) {
-        const gauge = document.getElementById(type + "-gauge");
-        const valueElement = document.getElementById(type + "-value");
-
-        // Calcular el stroke-dashoffset basado en el porcentaje
-        const circumference = 251.2;
-        const offset = circumference - (value / 100) * circumference;
-
-        gauge.style.strokeDashoffset = offset;
-        valueElement.textContent = Math.round(value) + "%";
-
-        // Cambiar color según el valor
-        if (value < 50) {
-          gauge.style.stroke = "#4CAF50"; // Verde
-        } else if (value < 80) {
-          gauge.style.stroke = "#FF9800"; // Naranja
-        } else {
-          gauge.style.stroke = "#F44336"; // Rojo
+        
+        // Actualización de sensores cada 0.5 segundos
+        function startSensorUpdates() {
+            sensorUpdateInterval = setInterval(updateSensorData, 500);
         }
-      }
-
-      // Verificar límites y mostrar/quitar alertas
-      function checkLimits(gasLevel, smokeLevel) {
-        // Verificar Gas LP
-        if (gasLevel > gasLimit) {
-          // Solo mostrar alerta si no está ya activa
-          if (!gasAlertActive) {
-            showAlert(
-              "¡ADVERTENCIA! Nivel de Gas LP peligroso: " +
-                Math.round(gasLevel) +
-                "%",
-              "danger",
-              "gas-alert"
-            );
-            gasAlertActive = true;
-
-            // Vibración en dispositivos móviles si está disponible
-            if (navigator.vibrate) {
-              navigator.vibrate([200, 100, 200]);
+        
+        async function updateSensorData() {
+            try {
+                // Endpoint GET para obtener datos de sensores
+                const response = await fetch('/api/sensor-data');
+                const data = await response.json();
+                
+                updateGauge('gas', data.gasLevel);
+                updateGauge('smoke', data.smokeLevel);
+                
+                // Verificar límites y mostrar alertas
+                checkLimits(data.gasLevel, data.smokeLevel);
+                
+            } catch (error) {
+                console.error('Error al obtener datos de sensores:', error);
+                // En caso de error, simular datos para demostración
+                simulateSensorData();
             }
-          }
-        } else {
-          // Si el nivel es seguro y había una alerta activa, quitarla
-          if (gasAlertActive) {
-            removeAlert("gas-alert");
-            showAlert(
-              "✅ Nivel de Gas LP normalizado: " + Math.round(gasLevel) + "%",
-              "success",
-              "gas-safe"
-            );
-            gasAlertActive = false;
-
-            // Quitar alerta de seguridad después de 3 segundos
-            setTimeout(() => {
-              removeAlert("gas-safe");
-            }, 3000);
-          }
         }
-
-        // Verificar Humo
-        if (smokeLevel > smokeLimit) {
-          // Solo mostrar alerta si no está ya activa
-          if (!smokeAlertActive) {
-            showAlert(
-              "¡ADVERTENCIA! Nivel de Humo peligroso: " +
-                Math.round(smokeLevel) +
-                "%",
-              "danger",
-              "smoke-alert"
-            );
-            smokeAlertActive = true;
-
-            // Vibración en dispositivos móviles si está disponible
-            if (navigator.vibrate) {
-              navigator.vibrate([200, 100, 200, 100, 200]);
+        
+        // Simulación de datos para demostración (remover en producción)
+        function simulateSensorData() {
+            const gasLevel = Math.random() * 100;
+            const smokeLevel = Math.random() * 100;
+            
+            updateGauge('gas', gasLevel);
+            updateGauge('smoke', smokeLevel);
+            checkLimits(gasLevel, smokeLevel);
+        }
+        
+        // Actualizar tacómetro
+        function updateGauge(type, value) {
+            const gauge = document.getElementById(type + '-gauge');
+            const valueElement = document.getElementById(type + '-value');
+            
+            // Calcular el stroke-dashoffset basado en el porcentaje
+            const circumference = 251.2;
+            const offset = circumference - (value / 100) * circumference;
+            
+            gauge.style.strokeDashoffset = offset;
+            valueElement.textContent = Math.round(value) + '%';
+            
+            // Cambiar color según el valor
+            if (value < 50) {
+                gauge.style.stroke = '#4CAF50'; // Verde
+            } else if (value < 80) {
+                gauge.style.stroke = '#FF9800'; // Naranja
+            } else {
+                gauge.style.stroke = '#F44336'; // Rojo
             }
-          }
-        } else {
-          // Si el nivel es seguro y había una alerta activa, quitarla
-          if (smokeAlertActive) {
-            removeAlert("smoke-alert");
-            showAlert(
-              "✅ Nivel de Humo normalizado: " + Math.round(smokeLevel) + "%",
-              "success",
-              "smoke-safe"
-            );
-            smokeAlertActive = false;
-
-            // Quitar alerta de seguridad después de 3 segundos
-            setTimeout(() => {
-              removeAlert("smoke-safe");
-            }, 3000);
-          }
         }
-
-        // Alerta crítica si ambos niveles son peligrosos
-        if (gasLevel > gasLimit && smokeLevel > smokeLimit) {
-          if (!document.getElementById("critical-alert")) {
-            showAlert(
-              "🚨 ¡PELIGRO CRÍTICO! Gas LP y Humo en niveles peligrosos",
-              "danger",
-              "critical-alert"
-            );
-
-            // Vibración más intensa para peligro crítico
-            if (navigator.vibrate) {
-              navigator.vibrate([500, 200, 500, 200, 500]);
+        
+        // Verificar límites y mostrar/quitar alertas
+        function checkLimits(gasLevel, smokeLevel) {
+            // Verificar Gas LP
+            if (gasLevel > gasLimit) {
+                // Solo mostrar alerta si no está ya activa
+                if (!gasAlertActive) {
+                    showAlert('¡ADVERTENCIA! Nivel de Gas LP peligroso: ' + Math.round(gasLevel) + '%', 'danger', 'gas-alert');
+                    gasAlertActive = true;
+                    
+                    // Vibración en dispositivos móviles si está disponible
+                    if (navigator.vibrate) {
+                        navigator.vibrate([200, 100, 200]);
+                    }
+                }
+            } else {
+                // Si el nivel es seguro y había una alerta activa, quitarla
+                if (gasAlertActive) {
+                    removeAlert('gas-alert');
+                    showAlert('✅ Nivel de Gas LP normalizado: ' + Math.round(gasLevel) + '%', 'success', 'gas-safe');
+                    gasAlertActive = false;
+                    
+                    // Quitar alerta de seguridad después de 3 segundos
+                    setTimeout(() => {
+                        removeAlert('gas-safe');
+                    }, 3000);
+                }
             }
-          }
-        } else {
-          // Quitar alerta crítica si ya no se cumplen ambas condiciones
-          removeAlert("critical-alert");
-        }
-      }
-
-      // Mostrar alertas con ID único
-      function showAlert(message, type, alertId = null) {
-        const alertContainer = document.getElementById("alert-container");
-
-        // Si se proporciona un ID, verificar si ya existe
-        if (alertId) {
-          const existingAlert = document.getElementById(alertId);
-          if (existingAlert) {
-            return; // No crear duplicados
-          }
-        }
-
-        const alert = document.createElement("div");
-        alert.className = "alert alert-" + type;
-        alert.textContent = message;
-        alert.style.display = "block";
-
-        // Asignar ID si se proporciona
-        if (alertId) {
-          alert.id = alertId;
-        }
-
-        // Añadir botón de cerrar para alertas de peligro
-        if (type === "danger") {
-          const closeButton = document.createElement("span");
-          closeButton.innerHTML = " ✕";
-          closeButton.style.float = "right";
-          closeButton.style.cursor = "pointer";
-          closeButton.style.fontWeight = "bold";
-          closeButton.onclick = () => {
-            alert.remove();
-            // Resetear estado de alerta si se cierra manualmente
-            if (alertId === "gas-alert") gasAlertActive = false;
-            if (alertId === "smoke-alert") smokeAlertActive = false;
-          };
-          alert.appendChild(closeButton);
-        }
-
-        alertContainer.appendChild(alert);
-
-        // Auto-remover después de 5 segundos para alertas de éxito
-        if (type === "success") {
-          setTimeout(() => {
-            if (alert.parentNode) {
-              alert.remove();
+            
+            // Verificar Humo
+            if (smokeLevel > smokeLimit) {
+                // Solo mostrar alerta si no está ya activa
+                if (!smokeAlertActive) {
+                    showAlert('¡ADVERTENCIA! Nivel de Humo peligroso: ' + Math.round(smokeLevel) + '%', 'danger', 'smoke-alert');
+                    smokeAlertActive = true;
+                    
+                    // Vibración en dispositivos móviles si está disponible
+                    if (navigator.vibrate) {
+                        navigator.vibrate([200, 100, 200, 100, 200]);
+                    }
+                }
+            } else {
+                // Si el nivel es seguro y había una alerta activa, quitarla
+                if (smokeAlertActive) {
+                    removeAlert('smoke-alert');
+                    showAlert('✅ Nivel de Humo normalizado: ' + Math.round(smokeLevel) + '%', 'success', 'smoke-safe');
+                    smokeAlertActive = false;
+                    
+                    // Quitar alerta de seguridad después de 3 segundos
+                    setTimeout(() => {
+                        removeAlert('smoke-safe');
+                    }, 3000);
+                }
             }
-          }, 5000);
+            
+            // Alerta crítica si ambos niveles son peligrosos
+            if (gasLevel > gasLimit && smokeLevel > smokeLimit) {
+                if (!document.getElementById('critical-alert')) {
+                    showAlert('🚨 ¡PELIGRO CRÍTICO! Gas LP y Humo en niveles peligrosos', 'danger', 'critical-alert');
+                    
+                    // Vibración más intensa para peligro crítico
+                    if (navigator.vibrate) {
+                        navigator.vibrate([500, 200, 500, 200, 500]);
+                    }
+                }
+            } else {
+                // Quitar alerta crítica si ya no se cumplen ambas condiciones
+                removeAlert('critical-alert');
+            }
         }
-      }
-
-      // Función para remover alertas específicas
-      function removeAlert(alertId) {
-        const alert = document.getElementById(alertId);
-        if (alert) {
-          alert.remove();
-        }
-      }
-
-      // Actualizar líneas de advertencia en los tacómetros
-      function updateWarningLines() {
-        const gasWarningLine = document.getElementById("gas-warning-line");
-        const smokeWarningLine = document.getElementById("smoke-warning-line");
-
-        const circumference = 251.2;
-
-        // Calcular posición de la línea de advertencia
-        const gasWarningOffset =
-          circumference - (gasLimit / 100) * circumference;
-        const smokeWarningOffset =
-          circumference - (smokeLimit / 100) * circumference;
-
-        gasWarningLine.style.strokeDashoffset = gasWarningOffset;
-        smokeWarningLine.style.strokeDashoffset = smokeWarningOffset;
-      }
-
-      // Mostrar alertas
-
-      // Cargar estado actual del dispositivo
-      async function loadCurrentStatus() {
-        try {
-          const response = await fetch("http://192.168.4.1/api/status");
-          const data = await response.json();
-
-          document.getElementById("current-ssid").textContent = data.ssid;
-          document.getElementById("new-ssid").value = data.ssid;
-        } catch (error) {
-          console.error("Error al cargar estado:", error);
-        }
-      }
-
-      // Escanear redes WiFi
-      async function scanWifiNetworks() {
-        const scanButton = event.target;
-        const scanText = document.getElementById("scan-text");
-        const scanLoading = document.getElementById("scan-loading");
-
-        scanText.style.display = "none";
-        scanLoading.style.display = "inline-block";
-        scanButton.disabled = true;
-
-        try {
-          const response = await fetch("http://192.168.4.1/wifi/scan");
-          const networks = await response.json();
-
-          displayWifiNetworks(networks);
-        } catch (error) {
-          console.error("Error al escanear redes:", error);
-          showAlert("Error al escanear redes WiFi", "danger");
-
-          // Simular redes para demostración
-          const mockNetworks = [
-            { ssid: "WiFi_Casa", signal: -45, security: "WPA2" },
-            { ssid: "Movistar_1234", signal: -60, security: "WPA2" },
-            { ssid: "INFINITUM_5678", signal: -75, security: "WPA2" },
-          ];
-          displayWifiNetworks(mockNetworks);
+        
+        // Mostrar alertas con ID único
+        function showAlert(message, type, alertId = null) {
+            const alertContainer = document.getElementById('alert-container');
+            
+            // Si se proporciona un ID, verificar si ya existe
+            if (alertId) {
+                const existingAlert = document.getElementById(alertId);
+                if (existingAlert) {
+                    return; // No crear duplicados
+                }
+            }
+            
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-' + type;
+            alert.textContent = message;
+            alert.style.display = 'block';
+            
+            // Asignar ID si se proporciona
+            if (alertId) {
+                alert.id = alertId;
+            }
+            
+            // Añadir botón de cerrar para alertas de peligro
+            if (type === 'danger') {
+                const closeButton = document.createElement('span');
+                closeButton.innerHTML = ' ✕';
+                closeButton.style.float = 'right';
+                closeButton.style.cursor = 'pointer';
+                closeButton.style.fontWeight = 'bold';
+                closeButton.onclick = () => {
+                    alert.remove();
+                    // Resetear estado de alerta si se cierra manualmente
+                    if (alertId === 'gas-alert') gasAlertActive = false;
+                    if (alertId === 'smoke-alert') smokeAlertActive = false;
+                };
+                alert.appendChild(closeButton);
+            }
+            
+            alertContainer.appendChild(alert);
+            
+            // Auto-remover después de 5 segundos para alertas de éxito
+            if (type === 'success') {
+                setTimeout(() => {
+                    if (alert.parentNode) {
+                        alert.remove();
+                    }
+                }, 5000);
+            }
         }
 
-        scanText.style.display = "inline";
-        scanLoading.style.display = "none";
-        scanButton.disabled = false;
-      }
-
-      // Mostrar redes WiFi encontradas
-      function displayWifiNetworks(networks) {
-        const container = document.getElementById("wifi-networks");
-        container.innerHTML = "";
-
-        networks.forEach((network) => {
-          const networkDiv = document.createElement("div");
-          networkDiv.className = "wifi-network";
-          networkDiv.onclick = () => selectWifiNetwork(network);
-
-          const signalStrength = getSignalIcon(network.signal);
-
-          networkDiv.innerHTML = `
+        // Función para remover alertas específicas
+        function removeAlert(alertId) {
+            const alert = document.getElementById(alertId);
+            if (alert) {
+                alert.remove();
+            }
+        }
+        
+        // Actualizar líneas de advertencia en los tacómetros
+        function updateWarningLines() {
+            const gasWarningLine = document.getElementById('gas-warning-line');
+            const smokeWarningLine = document.getElementById('smoke-warning-line');
+            
+            const circumference = 251.2;
+            
+            // Calcular posición de la línea de advertencia
+            const gasWarningOffset = circumference - (gasLimit / 100) * circumference;
+            const smokeWarningOffset = circumference - (smokeLimit / 100) * circumference;
+            
+            gasWarningLine.style.strokeDashoffset = gasWarningOffset;
+            smokeWarningLine.style.strokeDashoffset = smokeWarningOffset;
+        }
+        
+        // Calibrar valor cero de los sensores
+        async function calibrateZero() {
+            const calibrateBtn = document.getElementById('calibrate-btn');
+            const calibrateText = document.getElementById('calibrate-text');
+            const calibrateLoading = document.getElementById('calibrate-loading');
+            
+            // Mostrar confirmación antes de calibrar
+            const confirmCalibration = confirm(
+                '¿Está seguro de que desea calibrar el valor cero?\n\n' +
+                'IMPORTANTE: Asegúrese de que:\n' +
+                '• No hay gas LP presente en el ambiente\n' +
+                '• No hay humo en el área\n' +
+                '• Los sensores están en condiciones normales\n\n' +
+                'Este proceso tomará unos segundos.'
+            );
+            
+            if (!confirmCalibration) {
+                return;
+            }
+            
+            // Deshabilitar botón y mostrar loading
+            calibrateBtn.disabled = true;
+            calibrateText.style.display = 'none';
+            calibrateLoading.style.display = 'inline-block';
+            
+            try {
+                /*
+                 * ENDPOINT PARA CALIBRACIÓN DE VALOR CERO
+                 * 
+                 * POST /api/sensors/calibrate-zero
+                 * - Body: { sensorType: "all" } // o "gas", "smoke" para calibrar individualmente
+                 * - Retorna: { 
+                 *     success: boolean, 
+                 *     message: string,
+                 *     gasZeroValue: number,
+                 *     smokeZeroValue: number,
+                 *     calibrationTime: string
+                 *   }
+                 * 
+                 * Este endpoint debe:
+                 * 1. Tomar múltiples lecturas de los sensores (ej: 50 lecturas en 5 segundos)
+                 * 2. Calcular el promedio de estas lecturas
+                 * 3. Establecer este promedio como el nuevo valor cero
+                 * 4. Guardar la calibración en memoria no volátil
+                 * 5. Aplicar la calibración a todas las lecturas futuras
+                 */
+                
+                const response = await fetch('/api/sensors/calibrate-zero', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        sensorType: 'all', // Calibrar ambos sensores
+                        timestamp: new Date().toISOString()
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert(
+                        `✅ Calibración completada exitosamente!\n` +
+                        `Gas LP - Nuevo valor cero: ${result.gasZeroValue}\n` +
+                        `Humo - Nuevo valor cero: ${result.smokeZeroValue}\n` +
+                        `Hora de calibración: ${new Date(result.calibrationTime).toLocaleString()}`,
+                        'success',
+                        'calibration-success'
+                    );
+                    
+                    // Opcional: Mostrar información adicional
+                    console.log('Calibración completada:', result);
+                    
+                } else {
+                    showAlert(
+                        'Error en la calibración: ' + result.message + '\n' +
+                        'Verifique que los sensores estén funcionando correctamente.',
+                        'danger'
+                    );
+                }
+                
+            } catch (error) {
+                console.error('Error en calibración:', error);
+                showAlert(
+                    'Error de conexión durante la calibración.\n' +
+                    'Verifique la conexión con el dispositivo e intente nuevamente.',
+                    'danger'
+                );
+                
+                // En caso de error, simular respuesta para demostración
+                setTimeout(() => {
+                    showAlert(
+                        '✅ Calibración simulada completada!\n' +
+                        'Gas LP - Nuevo valor cero: 0.15\n' +
+                        'Humo - Nuevo valor cero: 0.08\n' +
+                        'Hora: ' + new Date().toLocaleString(),
+                        'success',
+                        'calibration-demo'
+                    );
+                }, 2000);
+            }
+            
+            // Restaurar botón
+            calibrateBtn.disabled = false;
+            calibrateText.style.display = 'inline';
+            calibrateLoading.style.display = 'none';
+        }
+        
+        // Mostrar alertas
+        
+        
+        // Cargar estado actual del dispositivo
+        async function loadCurrentStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                document.getElementById('current-ssid').textContent = data.ssid;
+                document.getElementById('new-ssid').value = data.ssid;
+                
+            } catch (error) {
+                console.error('Error al cargar estado:', error);
+            }
+        }
+        
+        // Escanear redes WiFi
+        async function scanWifiNetworks() {
+            const scanButton = event.target;
+            const scanText = document.getElementById('scan-text');
+            const scanLoading = document.getElementById('scan-loading');
+            
+            scanText.style.display = 'none';
+            scanLoading.style.display = 'inline-block';
+            scanButton.disabled = true;
+            
+            try {
+                const response = await fetch('/api/wifi/scan');
+                const networks = await response.json();
+                
+                displayWifiNetworks(networks);
+                
+            } catch (error) {
+                console.error('Error al escanear redes:', error);
+                showAlert('Error al escanear redes WiFi', 'danger');
+                
+                // Simular redes para demostración
+                const mockNetworks = [
+                    { ssid: 'WiFi_Casa', signal: -45, security: 'WPA2' },
+                    { ssid: 'Movistar_1234', signal: -60, security: 'WPA2' },
+                    { ssid: 'INFINITUM_5678', signal: -75, security: 'WPA2' }
+                ];
+                displayWifiNetworks(mockNetworks);
+            }
+            
+            scanText.style.display = 'inline';
+            scanLoading.style.display = 'none';
+            scanButton.disabled = false;
+        }
+        
+        // Mostrar redes WiFi encontradas
+        function displayWifiNetworks(networks) {
+            const container = document.getElementById('wifi-networks');
+            container.innerHTML = '';
+            
+            networks.forEach(network => {
+                const networkDiv = document.createElement('div');
+                networkDiv.className = 'wifi-network';
+                networkDiv.onclick = () => selectWifiNetwork(network);
+                
+                const signalStrength = getSignalIcon(network.signal);
+                
+                networkDiv.innerHTML = `
                     <div>
                         <strong>${network.ssid}</strong>
                         <br>
@@ -956,202 +967,173 @@
                     </div>
                     <div class="wifi-signal">${signalStrength}</div>
                 `;
-
-          container.appendChild(networkDiv);
-        });
-      }
-
-      // Obtener icono de señal WiFi
-      function getSignalIcon(signal) {
-        if (signal > -50) return "📶";
-        if (signal > -60) return "📶";
-        if (signal > -70) return "📶";
-        return "📶";
-      }
-
-      // Seleccionar red WiFi
-      function selectWifiNetwork(network) {
-        selectedWifiNetwork = network;
-
-        // Remover selección anterior
-        document.querySelectorAll(".wifi-network").forEach((net) => {
-          net.classList.remove("selected");
-        });
-
-        // Marcar como seleccionada
-        event.currentTarget.classList.add("selected");
-
-        // Mostrar formulario de conexión
-        document.getElementById("selected-ssid").value = network.ssid;
-        document.getElementById("wifi-form").style.display = "block";
-        document.getElementById("wifi-password").focus();
-      }
-
-      // Cancelar conexión WiFi
-      function cancelWifiConnection() {
-        document.getElementById("wifi-form").style.display = "none";
-        document.querySelectorAll(".wifi-network").forEach((net) => {
-          net.classList.remove("selected");
-        });
-        selectedWifiNetwork = null;
-      }
-
-      // Formulario de límites
-      document
-        .getElementById("limits-form")
-        .addEventListener("submit", async function (e) {
-          e.preventDefault();
-
-          const newGasLimit = parseInt(
-            document.getElementById("gas-limit").value
-          );
-          const newSmokeLimit = parseInt(
-            document.getElementById("smoke-limit").value
-          );
-
-          try {
-            const response = await fetch(
-              "http://192.168.4.1/api/limits/update",
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  gasLimit: newGasLimit,
-                  smokeLimit: newSmokeLimit,
-                }),
-              }
-            );
-
-            const result = await response.json();
-
-            if (result.success) {
-              gasLimit = newGasLimit;
-              smokeLimit = newSmokeLimit;
-              updateWarningLines();
-              showAlert("Límites actualizados correctamente", "success");
-            } else {
-              showAlert(
-                "Error al actualizar límites: " + result.message,
-                "danger"
-              );
-            }
-          } catch (error) {
-            console.error("Error:", error);
-            showAlert("Error de conexión al actualizar límites", "danger");
-          }
-        });
-
-      // Formulario de WiFi
-      document
-        .getElementById("wifi-form")
-        .addEventListener("submit", async function (e) {
-          e.preventDefault();
-
-          const ssid = document.getElementById("selected-ssid").value;
-          const password = document.getElementById("wifi-password").value;
-
-          try {
-            const response = await fetch(
-              "http://192.168.4.1/api/wifi/connect",
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  ssid: ssid,
-                  password: password,
-                }),
-              }
-            );
-
-            const result = await response.json();
-
-            if (result.success) {
-              showAlert("Conectado exitosamente a " + ssid, "success");
-              document.getElementById("wifi-form").style.display = "none";
-              document.getElementById("wifi-password").value = "";
-            } else {
-              showAlert("Error al conectar: " + result.message, "danger");
-              document.getElementById("wifi-password").value = "";
-              document.getElementById("wifi-password").focus();
-            }
-          } catch (error) {
-            console.error("Error:", error);
-            showAlert(
-              "Error de conexión al intentar conectar a WiFi",
-              "danger"
-            );
-          }
-        });
-
-      // Formulario de Access Point
-      document
-        .getElementById("ap-form")
-        .addEventListener("submit", async function (e) {
-          e.preventDefault();
-
-          const currentPassword =
-            document.getElementById("current-password").value;
-          const newSSID = document.getElementById("new-ssid").value;
-          const newPassword = document.getElementById("new-password").value;
-          const confirmPassword =
-            document.getElementById("confirm-password").value;
-
-          // Validar que las contraseñas coincidan
-          if (newPassword !== confirmPassword) {
-            showAlert("Las contraseñas no coinciden", "danger");
-            return;
-          }
-
-          try {
-            const response = await fetch(
-              "http://192.168.4.1/api/access-point/update",
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  currentPassword: currentPassword,
-                  newSSID: newSSID,
-                  newPassword: newPassword,
-                }),
-              }
-            );
-
-            const result = await response.json();
-
-            if (result.success) {
-              showAlert(
-                "Access Point actualizado correctamente. El dispositivo se reiniciará.",
-                "success"
-              );
-              document.getElementById("current-ssid").textContent = newSSID;
-
-              // Limpiar formulario
-              document.getElementById("ap-form").reset();
-              document.getElementById("new-ssid").value = newSSID;
-            } else {
-              showAlert(
-                "Error al actualizar Access Point: " + result.message,
-                "danger"
-              );
-            }
-          } catch (error) {
-            console.error("Error:", error);
-            showAlert("Error de conexión al actualizar Access Point", "danger");
-          }
-        });
-
-      // Limpiar alertas de peligro al hacer clic
-      document.addEventListener("click", function (e) {
-        if (e.target.classList.contains("alert-danger")) {
-          e.target.remove();
+                
+                container.appendChild(networkDiv);
+            });
         }
-      });
+        
+        // Obtener icono de señal WiFi
+        function getSignalIcon(signal) {
+            if (signal > -50) return '📶';
+            if (signal > -60) return '📶';
+            if (signal > -70) return '📶';
+            return '📶';
+        }
+        
+        // Seleccionar red WiFi
+        function selectWifiNetwork(network) {
+            selectedWifiNetwork = network;
+            
+            // Remover selección anterior
+            document.querySelectorAll('.wifi-network').forEach(net => {
+                net.classList.remove('selected');
+            });
+            
+            // Marcar como seleccionada
+            event.currentTarget.classList.add('selected');
+            
+            // Mostrar formulario de conexión
+            document.getElementById('selected-ssid').value = network.ssid;
+            document.getElementById('wifi-form').style.display = 'block';
+            document.getElementById('wifi-password').focus();
+        }
+        
+        // Cancelar conexión WiFi
+        function cancelWifiConnection() {
+            document.getElementById('wifi-form').style.display = 'none';
+            document.querySelectorAll('.wifi-network').forEach(net => {
+                net.classList.remove('selected');
+            });
+            selectedWifiNetwork = null;
+        }
+        
+        // Formulario de límites
+        document.getElementById('limits-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const newGasLimit = parseInt(document.getElementById('gas-limit').value);
+            const newSmokeLimit = parseInt(document.getElementById('smoke-limit').value);
+            
+            try {
+                const response = await fetch('/api/limits/update', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        gasLimit: newGasLimit,
+                        smokeLimit: newSmokeLimit
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    gasLimit = newGasLimit;
+                    smokeLimit = newSmokeLimit;
+                    updateWarningLines();
+                    showAlert('Límites actualizados correctamente', 'success');
+                } else {
+                    showAlert('Error al actualizar límites: ' + result.message, 'danger');
+                }
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showAlert('Error de conexión al actualizar límites', 'danger');
+            }
+        });
+        
+        // Formulario de WiFi
+        document.getElementById('wifi-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const ssid = document.getElementById('selected-ssid').value;
+            const password = document.getElementById('wifi-password').value;
+            
+            try {
+                const response = await fetch('/api/wifi/connect', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        ssid: ssid,
+                        password: password
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert('Conectado exitosamente a ' + ssid, 'success');
+                    document.getElementById('wifi-form').style.display = 'none';
+                    document.getElementById('wifi-password').value = '';
+                } else {
+                    showAlert('Error al conectar: ' + result.message, 'danger');
+                    document.getElementById('wifi-password').value = '';
+                    document.getElementById('wifi-password').focus();
+                }
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showAlert('Error de conexión al intentar conectar a WiFi', 'danger');
+            }
+        });
+        
+        // Formulario de Access Point
+        document.getElementById('ap-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const currentPassword = document.getElementById('current-password').value;
+            const newSSID = document.getElementById('new-ssid').value;
+            const newPassword = document.getElementById('new-password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+            
+            // Validar que las contraseñas coincidan
+            if (newPassword !== confirmPassword) {
+                showAlert('Las contraseñas no coinciden', 'danger');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/access-point/update', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        currentPassword: currentPassword,
+                        newSSID: newSSID,
+                        newPassword: newPassword
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert('Access Point actualizado correctamente. El dispositivo se reiniciará.', 'success');
+                    document.getElementById('current-ssid').textContent = newSSID;
+                    
+                    // Limpiar formulario
+                    document.getElementById('ap-form').reset();
+                    document.getElementById('new-ssid').value = newSSID;
+                    
+                } else {
+                    showAlert('Error al actualizar Access Point: ' + result.message, 'danger');
+                }
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showAlert('Error de conexión al actualizar Access Point', 'danger');
+            }
+        });
+        
+        // Limpiar alertas de peligro al hacer clic
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('alert-danger')) {
+                e.target.remove();
+            }
+        });
     </script>
-  </body>
+</body>
 </html>
