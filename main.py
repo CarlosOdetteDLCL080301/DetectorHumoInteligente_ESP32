@@ -5,7 +5,9 @@ import ure
 import ujson
 from machine import ADC, Pin
 import gc
-
+import usocket
+import ssl
+import urequests
 # ===== Configuración del sensor MQ2 =====
 mq2 = ADC(Pin(32))
 mq2.atten(ADC.ATTN_11DB)
@@ -23,10 +25,14 @@ LIMITS_FILE = 'limits.json'
 gasLimit = 0
 smokeLimit = 0
 
+# ===== Credenciales para Telegram Bot =====n# Reemplaza con el token de tu bot y el chat ID o user ID destino
+define_telegram_credentials = True
+TELEGRAM_TOKEN = '8030119069:AAFSY7FVQZ6qApd4C4OH3V5Frr0k7EajGsU'
+URL = 'https://api.telegram.org/bot' + TELEGRAM_TOKEN
+#https://api.telegram.org/bot7511726909:AAE7Fcxxk-_pLcyTXBqHIWBtwfIgK_F-uwQ/getUpdates
 # ===== Preparar interfaz STA (Para luego conectar a una red Wi-Fi) =====
-sta = network.WLAN(network.STA_IF)
-sta.active(True)
-
+wifi_connected = False
+sta_if = None
 # ===== Funciones de AP =====
 def setup_ap():
     global ap
@@ -105,15 +111,86 @@ def gas_porcentaje(sensor_val, tara=0, ref=500):
     return max(0, min(100, round(pct, 2)))
 
 # ===== Carga de HTML =====
+"""
 try:
     with open('index.html') as f:
         HTML_PAGE = f.read()
 except:
     HTML_PAGE = '<html><body><h1>Archivo no encontrado</h1></body></html>'
+"""
 
 # ===== Envío HTTP =====
 def send_header(cl, status_code=200, content_type='text/plain'):
     cl.send(f'HTTP/1.0 {status_code} OK\r\nContent-Type: {content_type}\r\n\r\n')
+
+# ===== Funciones para Telegram =====
+def obtenerChatID():
+    global TELEGRAM_TOKEN, URL
+    try:
+        print("TELEGRAM_1",URL)
+        res = urequests.get(URL+'/getUpdates')
+        print("TELEGRAM_2 VALE = ",res)
+        raw = res.text  # no uses .json() directamente
+        print("TELEGRAM_2 VALE = ",raw)
+        res.close()
+
+        data = ujson.loads(raw)  # usa ujson que es más ligero
+        print("TELEGRAM_2 VALE = ",data)
+        chat_id = data['result'][0]['message']['chat']['id']
+        print("TELEGRAM_2 VALE = ",chat_id)
+        print("Tu chat_id es:", chat_id)
+        return chat_id
+    except Exception as e:
+        print("Error al obtener chat_id:", e)
+        return None
+
+
+def telegram_send_minimal(chat_id, text):
+    global TELEGRAM_TOKEN
+    try:
+        gc.collect()
+        host = "api.telegram.org"
+        text = text.replace(" ", "%20")  # Codifica el mensaje
+        path = "/bot{}/sendMessage?chat_id={}&text={}".format(TELEGRAM_TOKEN, chat_id, text)
+
+        addr = socket.getaddrinfo(host, 443)[0][-1]
+        s = socket.socket()
+        gc.collect()
+        s.connect(addr)
+
+        gc.collect()
+        s = ssl.wrap_socket(s)
+
+        request = (
+            "GET {} HTTP/1.1\r\n"
+            "Host: {}\r\n"
+            "Connection: close\r\n\r\n"
+        ).format(path, host)
+
+        s.write(request.encode())
+
+        # s.read() eliminado para ahorrar RAM
+        s.close()
+        return True
+
+    except Exception as e:
+        print("Error al enviar mensaje:", e)
+        return False
+
+# ===== CONECTARME A INTERNET
+def do_connect(SSID, PASSWORD):
+    global wifi_connected, TELEGRAM_TOKEN
+    global sta_if
+    sta_if = network.WLAN(network.STA_IF)     # instancia el objeto -sta_if- para controlar la interfaz STA
+    if not sta_if.isconnected():              # si no existe conexión...
+        sta_if.active(True)                       # activa el interfaz STA del ESP32
+        sta_if.connect(SSID, PASSWORD)            # inicia la conexión con el AP
+        print('Conectando a la red', SSID +"...")
+        while not sta_if.isconnected():           # ...si no se ha establecido la conexión...
+            pass                                  # ...repite el bucle...
+    print('Configuración de red (IP/netmask/gw/DNS):', sta_if.ifconfig())
+    wifi_connected = sta_if.isconnected()
+
 
 # Para payload grandes, enviamos en bloques
 BLOCK_SIZE = 512
@@ -129,11 +206,22 @@ def handle_get(path, cl, tara):
         cl.send('OK')
     elif path in ['/', '/index.html']:
         send_header(cl, content_type='text/html')
-        send_payload(cl, HTML_PAGE)
+        try:
+            with open('index.html') as f:
+                for line in f:
+                    cl.send(line)
+        except:
+            cl.send('<html><body><h1>Error cargando index.html</h1></body></html>')
     elif path == '/api/sensor-data':
+        try:
+            wifi_connected = sta.isconnected()
+        except NameError:
+            # Si `sta` no está definida, asumimos que no hay conexión Wi-Fi
+            wifi_connected = False
         val = mq2.read()
         pct = gas_porcentaje(val, tara)
         data = ujson.dumps({'gasLevel': pct, 'smokeLevel': pct})
+
         send_header(cl, content_type='application/json')
         cl.send(data)
     elif path == '/api/wifi/scan':
@@ -167,7 +255,7 @@ def handle_get(path, cl, tara):
 
 
 def handle_post(path, req, cl, tara):
-    global gasLimit, smokeLimit, AP_SSID, AP_PASS, ap
+    global gasLimit, smokeLimit, AP_SSID, AP_PASS, ap, sta_if
     # extraemos body del req ya leído
     try:
         body = req.split(b'\r\n\r\n', 1)[1]
@@ -207,25 +295,17 @@ def handle_post(path, req, cl, tara):
             password = params.get('password', '')
             if not ssid:
                 raise ValueError('SSID vacío')
-
-            sta = network.WLAN(network.STA_IF)
-            sta.active(True)
-            sta.connect(ssid, password)
-
-            timeout = 10000  # 10 segundos
-            start = time.ticks_ms()
-            while not sta.isconnected() and time.ticks_diff(time.ticks_ms(), start) < timeout:
-                time.sleep(0.1)
-
-            if sta.isconnected():
-                resp = ujson.dumps({'success': True, 'ip': sta.ifconfig()[0]})
+            print(f"EL SSID es: {ssid} con psswrd: {password}")
+            do_connect(ssid,password)
+            if sta_if.isconnected():
+                resp = ujson.dumps({'success': True, 'ip': sta_if.ifconfig()[0]})
             else:
                 resp = ujson.dumps({'success': False, 'message': 'Timeout al conectar'})
         except Exception as e:
             resp = ujson.dumps({'success': False, 'message': str(e)})
         send_header(cl, content_type='application/json')
-        print(f"Se conectó? ", resp)
         cl.send(resp)
+        print("Se envió")
         return tara
     elif path == '/api/access-point/update':
         old_ap_pass = AP_PASS
@@ -259,43 +339,75 @@ def handle_post(path, req, cl, tara):
                 send_header(cl, content_type='application/json')
                 cl.send(resp)
             except OSError:
+                print("Hubo un error?")
                 pass
         return tara
     else:
         send_header(cl, status_code=404)
         cl.send('404')
     return tara
+"""
+def get_message(message):
+    bot.send(message['message']['chat']['id'], message['message']['text'].upper())
 
+def reply_ping(message):
+    print(message)
+    bot.send(message['message']['chat']['id'], 'pong')
+"""
 # ===== Bucle principal =====
 def main():
-    global ap
+    global ap, wifi_connected, TELEGRAM_TOKEN
     gc.collect()
     ap = setup_ap()
     tara = load_calibration()
     addr = socket.getaddrinfo('0.0.0.0', 80)[0][-1]
     sock = socket.socket()
-    sock.bind(addr)
-    sock.listen(1)
-    print('Servidor HTTP escuchando en', addr)
 
-    while True:
-        gc.collect()
-        check_new_clients(ap)
-        cl, addr = sock.accept()
-        req = cl.recv(2048)
-        try:
-            req_str = req.decode()
-        except:
+    try:
+        sock.bind(addr)
+        sock.listen(1)
+        print('Servidor HTTP escuchando en', addr)
+        inicializarTelegram = True
+
+        while True:
+            gc.collect()
+            check_new_clients(ap)
+            cl, addr = sock.accept()
+            req = cl.recv(2048)
+            try:
+                req_str = req.decode()
+            except:
+                cl.close()
+                continue
+
+            m = ure.search(r"(GET|POST)\s+(/[^\s]*)", req_str)
+            method, path = (m.group(1), m.group(2)) if m else ('GET', '/')
+            print('Petición', method, path, 'de', addr, "-- Internet = ", wifi_connected)
+
+            if method == 'GET':
+                handle_get(path, cl, tara)
+            else:
+                tara = handle_post(path, req, cl, tara)
+
+            if wifi_connected and inicializarTelegram:
+                try:
+                    telegram_send_minimal(8092336325,'ESTO ES UNA PRUEBA DE CONSOLA')
+                    inicializarTelegram = False
+                except Exception as e:
+                    print("Error actualizando Telegram:", e)
+
             cl.close()
-            continue
-        m = ure.search(r"(GET|POST)\s+(/[^\s]*)", req_str)
-        method, path = (m.group(1), m.group(2)) if m else ('GET', '/')
-        print('Petición', method, path, 'de', addr)
-        if method == 'GET':
-            handle_get(path, cl, tara)
-        else:
-            tara = handle_post(path, req, cl, tara)
-        cl.close()
+
+    except KeyboardInterrupt:
+        print("\nInterrupción con Ctrl+C detectada. Cerrando socket...")
+
+    except OSError as e:
+        print("Error del socket:", e)
+
+    finally:
+        sock.close()
+        print("Socket cerrado correctamente.")
+
 
 if __name__ == '__main__':
     main()
