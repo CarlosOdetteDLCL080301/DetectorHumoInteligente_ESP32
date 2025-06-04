@@ -8,6 +8,16 @@ import gc
 import usocket
 import ssl
 import urequests
+from machine import Pin
+import uos
+# ===== Configuración para los fisico =====
+led_advertencia = Pin(33,Pin.OUT)
+led_reinicio = Pin(2,Pin.OUT)
+boton = Pin(25, Pin.IN, Pin.PULL_UP)  # Activamos resistencia pull-up interna
+boton_reset = Pin(27, Pin.IN, Pin.PULL_UP)  # Activamos resistencia pull-up interna
+# Variables de control de estado
+led_silenciado_hasta = 0  # Guarda el tiempo hasta que el LED debe permanecer apagado
+
 # ===== Configuración del sensor MQ2 =====
 mq2 = ADC(Pin(32))
 mq2.atten(ADC.ATTN_11DB)
@@ -22,13 +32,15 @@ ap = None  # Será inicializado en setup_ap()
 CAL_FILE = 'calibration.json'
 # ===== Archivo y variables para límites =====
 LIMITS_FILE = 'limits.json'
-gasLimit = 0
-smokeLimit = 0
+pct = 0
+gasLimit = 80
+smokeLimit = 70
 
 # ===== Credenciales para Telegram Bot =====n# Reemplaza con el token de tu bot y el chat ID o user ID destino
 define_telegram_credentials = True
-TELEGRAM_TOKEN = '8030119069:AAFSY7FVQZ6qApd4C4OH3V5Frr0k7EajGsU'
+TELEGRAM_TOKEN = '7878612446:AAHQUq0v4gmt7RinUV3YPRoT0i5PG23uR1c'
 URL = 'https://api.telegram.org/bot' + TELEGRAM_TOKEN
+last_telegram_sent = 0  # en milisegundos
 #https://api.telegram.org/bot7511726909:AAE7Fcxxk-_pLcyTXBqHIWBtwfIgK_F-uwQ/getUpdates
 # ===== Preparar interfaz STA (Para luego conectar a una red Wi-Fi) =====
 wifi_connected = False
@@ -75,7 +87,8 @@ def load_calibration():
     try:
         with open(CAL_FILE) as f:
             return ujson.load(f).get('gasZeroValue', 0)
-    except:
+    except Exception as e:
+        print('Error cargando calibración:', e)
         return 0
 
 def save_calibration(zero_val):
@@ -93,9 +106,10 @@ def load_limits():
         data = ujson.load(open(LIMITS_FILE))
         gasLimit = data.get('gasLimit', 0)
         smokeLimit = data.get('smokeLimit', 0)
-    except:
-        gasLimit = 0
-        smokeLimit = 0
+    except Exception as e:
+        print('Error cargando limites:', e)
+        gasLimit = 80
+        smokeLimit = 70
 
 def save_limits():
     try:
@@ -110,15 +124,6 @@ def gas_porcentaje(sensor_val, tara=0, ref=500):
     pct = ((sensor_val - tara) / ref) * 100
     return max(0, min(100, round(pct, 2)))
 
-# ===== Carga de HTML =====
-"""
-try:
-    with open('index.html') as f:
-        HTML_PAGE = f.read()
-except:
-    HTML_PAGE = '<html><body><h1>Archivo no encontrado</h1></body></html>'
-"""
-
 # ===== Envío HTTP =====
 def send_header(cl, status_code=200, content_type='text/plain'):
     cl.send(f'HTTP/1.0 {status_code} OK\r\nContent-Type: {content_type}\r\n\r\n')
@@ -127,21 +132,14 @@ def send_header(cl, status_code=200, content_type='text/plain'):
 def obtenerChatID():
     global TELEGRAM_TOKEN, URL
     try:
-        print("TELEGRAM_1",URL)
         res = urequests.get(URL+'/getUpdates')
-        print("TELEGRAM_2 VALE = ",res)
-        raw = res.text  # no uses .json() directamente
-        print("TELEGRAM_2 VALE = ",raw)
+        raw = res.text  
         res.close()
 
-        data = ujson.loads(raw)  # usa ujson que es más ligero
-        print("TELEGRAM_2 VALE = ",data)
+        data = ujson.loads(raw)  # usar ujson que es más ligero
         chat_id = data['result'][0]['message']['chat']['id']
-        print("TELEGRAM_2 VALE = ",chat_id)
-        print("Tu chat_id es:", chat_id)
         return chat_id
     except Exception as e:
-        print("Error al obtener chat_id:", e)
         return None
 
 
@@ -201,6 +199,7 @@ def send_payload(cl, payload):
 
 # ===== Handlers =====
 def handle_get(path, cl, tara):
+    global pct
     if path == '/status':
         send_header(cl)
         cl.send('OK')
@@ -213,11 +212,6 @@ def handle_get(path, cl, tara):
         except:
             cl.send('<html><body><h1>Error cargando index.html</h1></body></html>')
     elif path == '/api/sensor-data':
-        try:
-            wifi_connected = sta.isconnected()
-        except NameError:
-            # Si `sta` no está definida, asumimos que no hay conexión Wi-Fi
-            wifi_connected = False
         val = mq2.read()
         pct = gas_porcentaje(val, tara)
         data = ujson.dumps({'gasLevel': pct, 'smokeLevel': pct})
@@ -269,10 +263,10 @@ def handle_post(path, req, cl, tara):
         zero_val = sum(readings) / len(readings)
         tara = zero_val
         resp = ujson.dumps({'success': True, 'gasZeroValue': zero_val})
+        save_calibration(zero_val)
         send_header(cl, content_type='application/json')
         cl.send(resp)
         elapsed = time.ticks_diff(time.ticks_ms(), start)
-        print('Tiempo POST /api/tara:', elapsed, 'ms')
         return tara
     elif path == '/api/limits/update':
         start = time.ticks_ms()
@@ -280,6 +274,7 @@ def handle_post(path, req, cl, tara):
             params = ujson.loads(body.decode())
             gasLimit = params.get('gasLimit', gasLimit)
             smokeLimit = params.get('smokeLimit', smokeLimit)
+            save_limits()
             resp = ujson.dumps({'success': True, 'gasLimit': gasLimit, 'smokeLimit': smokeLimit})
         except Exception as e:
             resp = ujson.dumps({'success': False, 'error': str(e)})
@@ -305,7 +300,6 @@ def handle_post(path, req, cl, tara):
             resp = ujson.dumps({'success': False, 'message': str(e)})
         send_header(cl, content_type='application/json')
         cl.send(resp)
-        print("Se envió")
         return tara
     elif path == '/api/access-point/update':
         old_ap_pass = AP_PASS
@@ -346,23 +340,69 @@ def handle_post(path, req, cl, tara):
         send_header(cl, status_code=404)
         cl.send('404')
     return tara
-"""
-def get_message(message):
-    bot.send(message['message']['chat']['id'], message['message']['text'].upper())
 
-def reply_ping(message):
-    print(message)
-    bot.send(message['message']['chat']['id'], 'pong')
-"""
+def question_deboAdvertir():
+    global led_advertencia, pct, smokeLimit, gasLimit, boton, led_silenciado_hasta
+
+    now = time.ticks_ms()
+
+    # Si el botón se presiona (valor LOW con pull-up interno)
+    if boton.value() == 0:
+        print("Botón presionado, silenciando advertencia por 30 segundos.")
+        led_silenciado_hasta = time.ticks_add(now, 30000)  # 30 segundos
+
+    # Revisamos si estamos dentro del periodo de silencio
+    if time.ticks_diff(led_silenciado_hasta, now) > 0:
+        # Aún estamos dentro del periodo de silencio
+        led_advertencia.value(0)
+    else:
+        # Fuera del periodo de silencio, evaluar normalmente
+        if (pct > smokeLimit or pct > gasLimit):
+            led_advertencia.value(1)
+        else:
+            led_advertencia.value(0)
+
+def question_deboReiniciar():
+    global boton_reset, pct, smokeLimit, gasLimit, led_reinicio,tara
+
+    # Si el botón está presionado (valor 0 con pull-up)
+    if boton_reset.value() == 0:
+        # 1) Reiniciar valores en memoria
+        print("REINICIANDO")
+        pct = 0
+        gasLimit = 80
+        smokeLimit = 70
+        tara = 0
+        # 2) Intentar eliminar el archivo de calibración
+        try:
+            uos.remove(CAL_FILE)
+        except OSError as e:
+            # Si no existe o hay otro error, simplemente lo ignoramos
+            print("[CAL_FILE] Error al eliminar ->", e)
+            pass
+        try:
+            uos.remove(LIMITS_FILE)
+        except OSError as e:
+            # Si no existe o hay otro error, simplemente lo ignoramos
+            print("[LIMITS_FILE] Error al eliminar ->", e)
+            pass
+        # 3) Encender el LED de reinicio (indicador)
+        led_reinicio.value(1)
+    else:
+        # Si el botón no está presionado, apagar el LED indicador
+        led_reinicio.value(0)
+
 # ===== Bucle principal =====
 def main():
-    global ap, wifi_connected, TELEGRAM_TOKEN
+    global ap, wifi_connected, TELEGRAM_TOKEN, pct, smokeLimit, gasLimit, last_telegram_sent
     gc.collect()
     ap = setup_ap()
     tara = load_calibration()
     addr = socket.getaddrinfo('0.0.0.0', 80)[0][-1]
     sock = socket.socket()
-
+    # Cargamos los limites
+    load_limits()
+    #do_connect('FamLopez_2.4G','#Lopez138642DCIYM')
     try:
         sock.bind(addr)
         sock.listen(1)
@@ -370,6 +410,8 @@ def main():
         inicializarTelegram = True
 
         while True:
+            question_deboReiniciar()
+            question_deboAdvertir()
             gc.collect()
             check_new_clients(ap)
             cl, addr = sock.accept()
@@ -389,13 +431,15 @@ def main():
             else:
                 tara = handle_post(path, req, cl, tara)
 
-            if wifi_connected and inicializarTelegram:
-                try:
-                    telegram_send_minimal(8092336325,'ESTO ES UNA PRUEBA DE CONSOLA')
-                    inicializarTelegram = False
-                except Exception as e:
-                    print("Error actualizando Telegram:", e)
-
+            if wifi_connected and (pct > smokeLimit or pct > gasLimit):
+                now = time.ticks_ms()
+                if time.ticks_diff(now, last_telegram_sent) > 6000:
+                    try:
+                        #telegram_send_minimal(8092336325, 'emergencia')
+                        last_telegram_sent = now  # actualiza tiempo del último envío
+                    except Exception as e:
+                        print("Error actualizando Telegram:", e)
+            gc.collect()
             cl.close()
 
     except KeyboardInterrupt:
